@@ -22,7 +22,7 @@ Single tkinter window with three vertical sections:
 - Cells for days outside the current month are empty
 
 ### Footer
-- Label showing "Gesamt: XX:XX Stunden" — sum of all hours in the displayed month
+- Label showing "Gesamt: X.Xh" — sum of all hours in the displayed month (decimal format, consistent with cell display)
 
 ## Day Entry Dialog
 
@@ -33,6 +33,7 @@ Clicking a day cell opens a `Toplevel` dialog:
 - "Speichern" button: calculates hours (end - start), saves entry, updates grid
 - "Löschen" button: removes the entry for that day, updates grid
 - Hours are computed as simple time difference (no overnight shifts)
+- Validation: if end < start or input is not valid HH:MM, show an error message and don't save
 
 ## Data Storage
 
