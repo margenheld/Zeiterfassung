@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 import calendar
 import datetime
+import os
+import sys
 from src.storage import Storage
 from src.time_utils import calculate_hours, validate_entry
 from src.report import generate_report
@@ -36,10 +38,11 @@ PAUSE_VALUES = [str(m) for m in range(0, 125, 5)]
 
 
 class App:
-    def __init__(self, root, storage, settings):
+    def __init__(self, root, storage, settings, base_path="."):
         self.root = root
         self.storage = storage
         self.settings = settings
+        self.base_path = base_path
         self.root.title("Zeiterfassung")
         self.root.configure(bg=BG)
 
@@ -362,8 +365,6 @@ class App:
         ).pack(side=tk.LEFT, padx=5)
 
     def _send_report(self):
-        import os
-
         recipient = self.settings.get("recipient")
         if not recipient:
             messagebox.showwarning(
@@ -373,7 +374,10 @@ class App:
             )
             return
 
-        if not os.path.exists("credentials.json"):
+        credentials_path = os.path.join(self.base_path, "credentials.json")
+        token_path = os.path.join(self.base_path, "token.json")
+
+        if not os.path.exists(credentials_path):
             messagebox.showerror(
                 "Keine Zugangsdaten",
                 "credentials.json nicht gefunden.\n\n"
@@ -395,7 +399,7 @@ class App:
             return
 
         try:
-            service = get_gmail_service()
+            service = get_gmail_service(credentials_path, token_path)
             month_name = MONTHS_DE[self.month]
             subject = f"Zeiterfassung — {month_name} {self.year}"
             send_email(service, recipient, subject, html)
