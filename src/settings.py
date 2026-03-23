@@ -5,6 +5,7 @@ DEFAULTS = {
     "email": "",
     "default_pause": 30,
     "recipient": "",
+    "autostart": False,
 }
 
 class Settings:

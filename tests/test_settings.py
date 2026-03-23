@@ -36,3 +36,6 @@ def test_corrupted_file(tmp_path):
 
 def test_recipient_default(tmp_settings):
     assert tmp_settings.get("recipient") == ""
+
+def test_autostart_default(tmp_settings):
+    assert tmp_settings.get("autostart") == False
