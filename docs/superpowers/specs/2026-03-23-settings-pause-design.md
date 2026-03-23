@@ -21,14 +21,15 @@ New file `settings.json` in project directory.
 {"email": "user@example.com", "default_pause": 30}
 ```
 
-- Loaded on app startup; created with defaults if missing
-- Managed by the existing `Storage` pattern (new `Settings` class or extend storage)
+- Loaded on app startup; created with defaults (`email: ""`, `default_pause: 30`) if missing or corrupted
+- Managed by a new `Settings` class (same pattern as `Storage`)
+- Settings dialog pre-populates fields with current saved values
 
 ## Day Entry Dialog Changes
 
 Add a third field below Start/Ende:
 
-- **Pause (Min):** dropdown, 5-min steps from 0 to 120
+- **Pause (Min):** dropdown showing values as plain numbers (0, 5, 10, ..., 120), 5-min steps
 - Pre-filled with `default_pause` from settings when creating a new entry
 - Pre-filled with the stored per-day value when editing an existing entry
 - Saved per day in `zeiterfassung.json`
@@ -41,14 +42,15 @@ Add a third field below Start/Ende:
 {"2026-03-23": {"start": "08:00", "end": "16:30", "pause": 30}}
 ```
 
-- Backward compatibility: existing entries without `pause` field use `default_pause` from settings, or 0 if no settings exist
+- Backward compatibility: existing entries without `pause` field are treated as pause=0 on display (no migration, no silent default application)
 
 ## Hour Calculation Changes
 
-- Current: `end - start`
-- New: `end - start - pause_minutes`
+- Current: `calculate_hours("08:00", "16:30")` → converts to minutes, subtracts, returns decimal hours
+- New: `calculate_hours("08:00", "16:30", pause_minutes=30)` → same, but also subtracts pause minutes before converting to hours
+- Example: (16:30 - 08:00) = 510min - 30min pause = 480min = 8.0h
+- No validation that pause < work duration (user responsibility, small tool)
 - Applies to: cell display, footer total
-- `calculate_hours` in `time_utils.py` gets an optional `pause_minutes` parameter (default 0)
 
 ## Files to Modify/Create
 
