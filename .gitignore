@@ -6,3 +6,6 @@ zeiterfassung.json
 credentials.json
 token.json
 settings.json
+dist/
+build/
+*.spec
