@@ -12,11 +12,27 @@ MONTHS_DE = [
     "Juli", "August", "September", "Oktober", "November", "Dezember"
 ]
 
+# Dark Modern color palette
+BG = "#1a1a2e"
+CELL_BG = "#16213e"
+WEEKEND_BG = "#0f3460"
+ACCENT = "#e94560"
+TEXT = "#e0e0e0"
+TEXT_MUTED = "#888888"
+ENTRY_BG = "#1a3a5c"
+WEEKEND_ENTRY_BG = "#1a3050"
+FONT = ("Segoe UI", 10)
+FONT_BOLD = ("Segoe UI", 10, "bold")
+FONT_HEADER = ("Segoe UI", 16, "bold")
+FONT_FOOTER = ("Segoe UI", 12, "bold")
+
+
 class App:
     def __init__(self, root, storage):
         self.root = root
         self.storage = storage
         self.root.title("Zeiterfassung")
+        self.root.configure(bg=BG)
 
         today = datetime.date.today()
         self.year = today.year
@@ -28,20 +44,37 @@ class App:
         self._refresh()
 
     def _build_header(self):
-        frame = tk.Frame(self.root)
+        frame = tk.Frame(self.root, bg=BG)
         frame.pack(fill=tk.X, padx=10, pady=(10, 0))
 
-        tk.Button(frame, text="<", command=self._prev_month, width=3).pack(side=tk.LEFT)
-        self.header_label = tk.Label(frame, text="", font=("Arial", 14, "bold"))
+        tk.Button(
+            frame, text="\u2039", command=self._prev_month, width=3,
+            font=FONT_BOLD, bg=CELL_BG, fg=ACCENT,
+            activebackground=ENTRY_BG, activeforeground=ACCENT,
+            relief=tk.FLAT, cursor="hand2"
+        ).pack(side=tk.LEFT)
+
+        self.header_label = tk.Label(
+            frame, text="", font=FONT_HEADER, bg=BG, fg="#ffffff"
+        )
         self.header_label.pack(side=tk.LEFT, expand=True)
-        tk.Button(frame, text=">", command=self._next_month, width=3).pack(side=tk.RIGHT)
+
+        tk.Button(
+            frame, text="\u203a", command=self._next_month, width=3,
+            font=FONT_BOLD, bg=CELL_BG, fg=ACCENT,
+            activebackground=ENTRY_BG, activeforeground=ACCENT,
+            relief=tk.FLAT, cursor="hand2"
+        ).pack(side=tk.RIGHT)
 
     def _build_grid(self):
-        self.grid_frame = tk.Frame(self.root)
+        self.grid_frame = tk.Frame(self.root, bg=BG)
         self.grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
     def _build_footer(self):
-        self.footer_label = tk.Label(self.root, text="Gesamt: 0.0h", font=("Arial", 12))
+        self.footer_label = tk.Label(
+            self.root, text="Gesamt: 0.0h", font=FONT_FOOTER,
+            bg=BG, fg=ACCENT
+        )
         self.footer_label.pack(pady=(0, 10))
 
     def _prev_month(self):
@@ -68,46 +101,60 @@ class App:
 
         # Column headers
         for col, day_name in enumerate(DAYS_DE):
-            lbl = tk.Label(self.grid_frame, text=day_name, font=("Arial", 10, "bold"))
-            lbl.grid(row=0, column=col, sticky="nsew", padx=1, pady=1)
+            fg = TEXT_MUTED if col < 5 else "#6c6c80"
+            lbl = tk.Label(
+                self.grid_frame, text=day_name, font=FONT_BOLD,
+                bg=BG, fg=fg
+            )
+            lbl.grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
 
         # Calendar weeks
-        cal = calendar.Calendar(firstweekday=0)  # Monday first
+        cal = calendar.Calendar(firstweekday=0)
         entries = self.storage.get_all()
         total_hours = 0.0
 
         for row, week in enumerate(cal.monthdayscalendar(self.year, self.month), start=1):
             for col, day in enumerate(week):
                 if day == 0:
-                    # Day outside current month
-                    lbl = tk.Label(self.grid_frame, text="", relief=tk.FLAT)
-                    lbl.grid(row=row, column=col, sticky="nsew", padx=1, pady=1)
+                    lbl = tk.Label(
+                        self.grid_frame, text="", bg=BG, relief=tk.FLAT
+                    )
+                    lbl.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
                     continue
 
                 date_str = f"{self.year}-{self.month:02d}-{day:02d}"
                 entry = entries.get(date_str)
+                is_weekend = col >= 5
 
                 text = str(day)
+                fg = TEXT
+                if is_weekend and not entry:
+                    fg = "#6c6c80"
+
                 if entry:
                     hours = calculate_hours(entry["start"], entry["end"])
                     text += f"\n{hours}h"
                     total_hours += hours
+                    bg = WEEKEND_ENTRY_BG if is_weekend else ENTRY_BG
+                    cell = tk.Label(
+                        self.grid_frame, text=text, font=FONT,
+                        bg=bg, fg=TEXT, relief=tk.SOLID,
+                        highlightbackground=ACCENT, highlightthickness=1,
+                        width=8, height=3, cursor="hand2"
+                    )
+                else:
+                    bg = WEEKEND_BG if is_weekend else CELL_BG
+                    cell = tk.Label(
+                        self.grid_frame, text=text, font=FONT,
+                        bg=bg, fg=fg, relief=tk.FLAT,
+                        width=8, height=3, cursor="hand2"
+                    )
 
-                is_weekend = col >= 5
-                bg = "#e0e0e0" if is_weekend else "#ffffff"
-                if entry:
-                    bg = "#d4edda" if not is_weekend else "#c8d6c0"
-
-                cell = tk.Label(
-                    self.grid_frame, text=text, relief=tk.RIDGE,
-                    bg=bg, width=8, height=3, cursor="hand2"
-                )
-                cell.grid(row=row, column=col, sticky="nsew", padx=1, pady=1)
+                cell.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
                 cell.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
 
         self.footer_label.config(text=f"Gesamt: {round(total_hours, 2)}h")
 
-        # Make grid columns expand evenly
         for col in range(7):
             self.grid_frame.columnconfigure(col, weight=1)
 
@@ -116,16 +163,37 @@ class App:
         dialog.title(date_str)
         dialog.resizable(False, False)
         dialog.grab_set()
+        dialog.configure(bg=BG)
 
         entry = self.storage.get(date_str)
 
-        tk.Label(dialog, text="Start (HH:MM):").grid(row=0, column=0, padx=10, pady=5)
-        start_var = tk.StringVar(value=entry["start"] if entry else "")
-        tk.Entry(dialog, textvariable=start_var, width=10).grid(row=0, column=1, padx=10, pady=5)
+        tk.Label(
+            dialog, text="Start (HH:MM):", font=FONT,
+            bg=BG, fg=TEXT
+        ).grid(row=0, column=0, padx=10, pady=8)
 
-        tk.Label(dialog, text="Ende (HH:MM):").grid(row=1, column=0, padx=10, pady=5)
+        start_var = tk.StringVar(value=entry["start"] if entry else "")
+        start_entry = tk.Entry(
+            dialog, textvariable=start_var, width=10, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1
+        )
+        start_entry.grid(row=0, column=1, padx=10, pady=8)
+
+        tk.Label(
+            dialog, text="Ende (HH:MM):", font=FONT,
+            bg=BG, fg=TEXT
+        ).grid(row=1, column=0, padx=10, pady=8)
+
         end_var = tk.StringVar(value=entry["end"] if entry else "")
-        tk.Entry(dialog, textvariable=end_var, width=10).grid(row=1, column=1, padx=10, pady=5)
+        end_entry = tk.Entry(
+            dialog, textvariable=end_var, width=10, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1
+        )
+        end_entry.grid(row=1, column=1, padx=10, pady=8)
 
         def save():
             ok, msg = validate_entry(start_var.get(), end_var.get())
@@ -141,7 +209,19 @@ class App:
             dialog.destroy()
             self._refresh()
 
-        btn_frame = tk.Frame(dialog)
-        btn_frame.grid(row=2, column=0, columnspan=2, pady=10)
-        tk.Button(btn_frame, text="Speichern", command=save).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Löschen", command=delete).pack(side=tk.LEFT, padx=5)
+        btn_frame = tk.Frame(dialog, bg=BG)
+        btn_frame.grid(row=2, column=0, columnspan=2, pady=12)
+
+        tk.Button(
+            btn_frame, text="Speichern", command=save, font=FONT_BOLD,
+            bg=ACCENT, fg="#ffffff",
+            activebackground="#c73550", activeforeground="#ffffff",
+            relief=tk.FLAT, padx=16, pady=4, cursor="hand2"
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame, text="Löschen", command=delete, font=FONT,
+            bg=CELL_BG, fg=TEXT,
+            activebackground=ENTRY_BG, activeforeground=TEXT,
+            relief=tk.FLAT, padx=16, pady=4, cursor="hand2"
+        ).pack(side=tk.LEFT, padx=5)
