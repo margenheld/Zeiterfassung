@@ -9,7 +9,7 @@ Send the current month's time report as a formatted HTML email via Gmail OAuth2.
 - Requires a Google Cloud project with Gmail API enabled
 - OAuth2 Client-ID (Desktop App) saved as `credentials.json` in project directory
 - First send opens browser for Google login consent
-- Token stored locally as `token.json` (auto-refresh on expiry)
+- Token stored locally as `token.json` in project directory (auto-refresh via google-auth library; if refresh fails, re-prompt OAuth consent)
 - External dependencies: `google-auth-oauthlib`, `google-api-python-client`
 
 ## HTML Report
@@ -28,6 +28,9 @@ An HTML-formatted table of the currently displayed month. Only days with entries
 - Footer row: **Gesamt: X.Xh**
 - Date format: DD.MM.YYYY
 - Weekday names in German (Mo, Di, Mi, Do, Fr, Sa, So)
+- HTML styling: simple inline CSS, clean professional look — light background, bordered table, bold header row. No complex theming needed.
+- Brief greeting line above table: "Zeiterfassung für {Month} {Year}:"
+- No closing text, just the table and total
 
 ## UI Changes
 
@@ -53,7 +56,10 @@ An HTML-formatted table of the currently displayed month. Only days with entries
 {"email": "", "default_pause": 30, "recipient": ""}
 ```
 
-Default for `recipient`: empty string.
+- `email`: sender's own email (existing field, informational — the actual sender is the authenticated Gmail account)
+- `recipient`: the address reports are sent to
+- Default for `recipient`: empty string
+- Settings dialog field order: E-Mail → Standard-Pause → Empfänger
 
 ## New Files
 
