@@ -22,8 +22,8 @@ class Storage:
     def get(self, date_str):
         return self._data.get(date_str)
 
-    def save(self, date_str, start, end):
-        self._data[date_str] = {"start": start, "end": end}
+    def save(self, date_str, start, end, pause=0):
+        self._data[date_str] = {"start": start, "end": end, "pause": pause}
         self._save_to_disk()
 
     def delete(self, date_str):

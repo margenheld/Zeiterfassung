@@ -11,7 +11,7 @@ def test_load_empty(tmp_storage):
 def test_save_and_load(tmp_storage):
     tmp_storage.save("2026-03-23", "08:00", "16:30")
     entries = tmp_storage.get_all()
-    assert entries["2026-03-23"] == {"start": "08:00", "end": "16:30"}
+    assert entries["2026-03-23"] == {"start": "08:00", "end": "16:30", "pause": 0}
 
 def test_delete_entry(tmp_storage):
     tmp_storage.save("2026-03-23", "08:00", "16:30")
@@ -26,4 +26,14 @@ def test_persistence(tmp_path):
     s1 = Storage(path)
     s1.save("2026-03-23", "08:00", "16:30")
     s2 = Storage(path)
-    assert s2.get_all()["2026-03-23"] == {"start": "08:00", "end": "16:30"}
+    assert s2.get_all()["2026-03-23"] == {"start": "08:00", "end": "16:30", "pause": 0}
+
+def test_save_with_pause(tmp_storage):
+    tmp_storage.save("2026-03-23", "08:00", "16:30", pause=30)
+    entry = tmp_storage.get("2026-03-23")
+    assert entry == {"start": "08:00", "end": "16:30", "pause": 30}
+
+def test_save_default_pause_zero(tmp_storage):
+    tmp_storage.save("2026-03-23", "08:00", "16:30")
+    entry = tmp_storage.get("2026-03-23")
+    assert entry == {"start": "08:00", "end": "16:30", "pause": 0}
