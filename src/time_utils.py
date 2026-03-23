@@ -11,15 +11,15 @@ def parse_time(time_str):
     except (ValueError, AttributeError):
         return None
 
-def calculate_hours(start_str, end_str):
-    """Calculate decimal hours between two HH:MM strings."""
+def calculate_hours(start_str, end_str, pause_minutes=0):
+    """Calculate decimal hours between two HH:MM strings, minus pause."""
     start = parse_time(start_str)
     end = parse_time(end_str)
     if start is None or end is None:
         return 0.0
     start_min = start[0] * 60 + start[1]
     end_min = end[0] * 60 + end[1]
-    return round((end_min - start_min) / 60, 2)
+    return round((end_min - start_min - pause_minutes) / 60, 2)
 
 def validate_entry(start_str, end_str):
     """Validate a time entry. Returns (ok, error_message)."""
