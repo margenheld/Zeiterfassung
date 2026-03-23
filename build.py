@@ -4,7 +4,7 @@ import sys
 
 def build():
     cmd = [
-        sys.executable, "-m", "pyinstaller",
+        sys.executable, "-m", "PyInstaller",
         "--onefile",
         "--noconsole",
         "--name", "Zeiterfassung",
