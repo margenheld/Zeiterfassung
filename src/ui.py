@@ -423,32 +423,150 @@ class App:
             )
             return
 
-        entries = self.storage.get_all()
-        html = generate_report(self.year, self.month, entries)
+        # Date range dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Zeitraum wählen")
+        dialog.resizable(False, False)
+        dialog.grab_set()
+        dialog.configure(bg=BG)
 
-        if html is None:
-            messagebox.showinfo(
-                "Keine Einträge",
-                f"Keine Einträge für {MONTHS_DE[self.month]} {self.year} vorhanden.",
-                parent=self.root
-            )
-            return
+        self._apply_combobox_style(dialog)
 
-        try:
-            service = get_gmail_service(credentials_path, token_path)
-            month_name = MONTHS_DE[self.month]
-            subject = f"Zeiterfassung — {month_name} {self.year}"
-            send_email(service, recipient, subject, html)
-            messagebox.showinfo(
-                "Gesendet",
-                f"Bericht für {month_name} {self.year} wurde an {recipient} gesendet.",
-                parent=self.root
-            )
-        except FileNotFoundError as e:
-            messagebox.showerror("Fehler", str(e), parent=self.root)
-        except Exception as e:
-            messagebox.showerror(
-                "Senden fehlgeschlagen",
-                f"Fehler beim Senden:\n{e}",
-                parent=self.root
-            )
+        today = datetime.date.today()
+        # Default: one month ago to today
+        if today.month == 1:
+            from_default = today.replace(year=today.year - 1, month=12)
+        else:
+            # Handle months where from-day exceeds target month length
+            import calendar as cal_mod
+            from_month = today.month - 1
+            from_year = today.year
+            max_day = cal_mod.monthrange(from_year, from_month)[1]
+            from_default = today.replace(month=from_month, day=min(today.day, max_day))
+
+        day_values = [str(d) for d in range(1, 32)]
+        month_values = [str(m) for m in range(1, 13)]
+        year_values = [str(y) for y in range(2020, today.year + 2)]
+
+        # Von
+        tk.Label(
+            dialog, text="Von:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=0, column=0, padx=(10, 5), pady=8, sticky="w")
+
+        from_day_var = tk.StringVar(value=str(from_default.day))
+        from_day_cb = ttk.Combobox(
+            dialog, textvariable=from_day_var, values=day_values,
+            width=3, font=FONT, style="Dark.TCombobox", state="readonly"
+        )
+        from_day_cb.grid(row=0, column=1, padx=2, pady=8)
+
+        tk.Label(dialog, text=".", font=FONT, bg=BG, fg=TEXT).grid(row=0, column=2)
+
+        from_month_var = tk.StringVar(value=str(from_default.month))
+        from_month_cb = ttk.Combobox(
+            dialog, textvariable=from_month_var, values=month_values,
+            width=3, font=FONT, style="Dark.TCombobox", state="readonly"
+        )
+        from_month_cb.grid(row=0, column=3, padx=2, pady=8)
+
+        tk.Label(dialog, text=".", font=FONT, bg=BG, fg=TEXT).grid(row=0, column=4)
+
+        from_year_var = tk.StringVar(value=str(from_default.year))
+        from_year_cb = ttk.Combobox(
+            dialog, textvariable=from_year_var, values=year_values,
+            width=5, font=FONT, style="Dark.TCombobox", state="readonly"
+        )
+        from_year_cb.grid(row=0, column=5, padx=(2, 10), pady=8)
+
+        # Bis
+        tk.Label(
+            dialog, text="Bis:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=1, column=0, padx=(10, 5), pady=8, sticky="w")
+
+        to_day_var = tk.StringVar(value=str(today.day))
+        to_day_cb = ttk.Combobox(
+            dialog, textvariable=to_day_var, values=day_values,
+            width=3, font=FONT, style="Dark.TCombobox", state="readonly"
+        )
+        to_day_cb.grid(row=1, column=1, padx=2, pady=8)
+
+        tk.Label(dialog, text=".", font=FONT, bg=BG, fg=TEXT).grid(row=1, column=2)
+
+        to_month_var = tk.StringVar(value=str(today.month))
+        to_month_cb = ttk.Combobox(
+            dialog, textvariable=to_month_var, values=month_values,
+            width=3, font=FONT, style="Dark.TCombobox", state="readonly"
+        )
+        to_month_cb.grid(row=1, column=3, padx=2, pady=8)
+
+        tk.Label(dialog, text=".", font=FONT, bg=BG, fg=TEXT).grid(row=1, column=4)
+
+        to_year_var = tk.StringVar(value=str(today.year))
+        to_year_cb = ttk.Combobox(
+            dialog, textvariable=to_year_var, values=year_values,
+            width=5, font=FONT, style="Dark.TCombobox", state="readonly"
+        )
+        to_year_cb.grid(row=1, column=5, padx=(2, 10), pady=8)
+
+        def do_send():
+            try:
+                date_from = datetime.date(
+                    int(from_year_var.get()), int(from_month_var.get()), int(from_day_var.get())
+                )
+                date_to = datetime.date(
+                    int(to_year_var.get()), int(to_month_var.get()), int(to_day_var.get())
+                )
+            except ValueError:
+                messagebox.showerror("Ungültiges Datum", "Bitte ein gültiges Datum eingeben.", parent=dialog)
+                return
+
+            if date_from > date_to:
+                messagebox.showerror("Ungültiger Zeitraum", "Das Von-Datum muss vor dem Bis-Datum liegen.", parent=dialog)
+                return
+
+            entries = self.storage.get_all()
+            html = generate_report(date_from, date_to, entries)
+
+            if html is None:
+                messagebox.showinfo(
+                    "Keine Einträge",
+                    f"Keine Einträge für {date_from.strftime('%d.%m.%Y')} – {date_to.strftime('%d.%m.%Y')} vorhanden.",
+                    parent=dialog
+                )
+                return
+
+            try:
+                service = get_gmail_service(credentials_path, token_path)
+                subject = f"Zeiterfassung — {date_from.strftime('%d.%m.%Y')} – {date_to.strftime('%d.%m.%Y')}"
+                send_email(service, recipient, subject, html)
+                dialog.destroy()
+                messagebox.showinfo(
+                    "Gesendet",
+                    f"Bericht für {date_from.strftime('%d.%m.%Y')} – {date_to.strftime('%d.%m.%Y')} wurde an {recipient} gesendet.",
+                    parent=self.root
+                )
+            except FileNotFoundError as e:
+                messagebox.showerror("Fehler", str(e), parent=dialog)
+            except Exception as e:
+                messagebox.showerror(
+                    "Senden fehlgeschlagen",
+                    f"Fehler beim Senden:\n{e}",
+                    parent=dialog
+                )
+
+        btn_frame = tk.Frame(dialog, bg=BG)
+        btn_frame.grid(row=2, column=0, columnspan=6, pady=12)
+
+        tk.Button(
+            btn_frame, text="Senden", command=do_send, font=FONT_BOLD,
+            bg=ACCENT, fg="#ffffff",
+            activebackground="#c73550", activeforeground="#ffffff",
+            relief=tk.FLAT, padx=16, pady=4, cursor="hand2"
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame, text="Abbrechen", command=dialog.destroy, font=FONT,
+            bg=CELL_BG, fg=TEXT,
+            activebackground=ENTRY_BG, activeforeground=TEXT,
+            relief=tk.FLAT, padx=16, pady=4, cursor="hand2"
+        ).pack(side=tk.LEFT, padx=5)
