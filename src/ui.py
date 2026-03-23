@@ -5,6 +5,8 @@ import calendar
 import datetime
 from src.storage import Storage
 from src.time_utils import calculate_hours, validate_entry
+from src.report import generate_report
+from src.mail import get_gmail_service, send_email
 
 DAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 MONTHS_DE = [
@@ -85,11 +87,21 @@ class App:
         self.grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
     def _build_footer(self):
+        footer_frame = tk.Frame(self.root, bg=BG)
+        footer_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
         self.footer_label = tk.Label(
-            self.root, text="Gesamt: 0.0h", font=FONT_FOOTER,
+            footer_frame, text="Gesamt: 0.0h", font=FONT_FOOTER,
             bg=BG, fg=ACCENT
         )
-        self.footer_label.pack(pady=(0, 10))
+        self.footer_label.pack(side=tk.LEFT, expand=True)
+
+        tk.Button(
+            footer_frame, text="Monat senden", command=self._send_report,
+            font=FONT, bg=CELL_BG, fg=TEXT,
+            activebackground=ENTRY_BG, activeforeground=TEXT,
+            relief=tk.FLAT, padx=12, pady=4, cursor="hand2"
+        ).pack(side=tk.RIGHT)
 
     def _prev_month(self):
         if self.month == 1:
@@ -162,13 +174,27 @@ class App:
             width=8, font=FONT, style="Dark.TCombobox", state="readonly"
         ).grid(row=1, column=1, padx=10, pady=8)
 
+        # Recipient
+        tk.Label(
+            dialog, text="Empfänger:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=2, column=0, padx=10, pady=8, sticky="w")
+
+        recipient_var = tk.StringVar(value=self.settings.get("recipient"))
+        tk.Entry(
+            dialog, textvariable=recipient_var, width=25, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1
+        ).grid(row=2, column=1, padx=10, pady=8)
+
         def save_settings():
             self.settings.set("email", email_var.get())
             self.settings.set("default_pause", int(pause_var.get()))
+            self.settings.set("recipient", recipient_var.get())
             dialog.destroy()
 
         btn_frame = tk.Frame(dialog, bg=BG)
-        btn_frame.grid(row=2, column=0, columnspan=2, pady=12)
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=12)
 
         tk.Button(
             btn_frame, text="Speichern", command=save_settings, font=FONT_BOLD,
@@ -334,3 +360,55 @@ class App:
             activebackground=ENTRY_BG, activeforeground=TEXT,
             relief=tk.FLAT, padx=16, pady=4, cursor="hand2"
         ).pack(side=tk.LEFT, padx=5)
+
+    def _send_report(self):
+        import os
+
+        recipient = self.settings.get("recipient")
+        if not recipient:
+            messagebox.showwarning(
+                "Kein Empfänger",
+                "Bitte zuerst einen Empfänger in den Einstellungen angeben.",
+                parent=self.root
+            )
+            return
+
+        if not os.path.exists("credentials.json"):
+            messagebox.showerror(
+                "Keine Zugangsdaten",
+                "credentials.json nicht gefunden.\n\n"
+                "Bitte erstelle ein Google Cloud Projekt mit Gmail API "
+                "und lade die OAuth2 Client-ID als credentials.json herunter.",
+                parent=self.root
+            )
+            return
+
+        entries = self.storage.get_all()
+        html = generate_report(self.year, self.month, entries)
+
+        if html is None:
+            messagebox.showinfo(
+                "Keine Einträge",
+                f"Keine Einträge für {MONTHS_DE[self.month]} {self.year} vorhanden.",
+                parent=self.root
+            )
+            return
+
+        try:
+            service = get_gmail_service()
+            month_name = MONTHS_DE[self.month]
+            subject = f"Zeiterfassung — {month_name} {self.year}"
+            send_email(service, recipient, subject, html)
+            messagebox.showinfo(
+                "Gesendet",
+                f"Bericht für {month_name} {self.year} wurde an {recipient} gesendet.",
+                parent=self.root
+            )
+        except FileNotFoundError as e:
+            messagebox.showerror("Fehler", str(e), parent=self.root)
+        except Exception as e:
+            messagebox.showerror(
+                "Senden fehlgeschlagen",
+                f"Fehler beim Senden:\n{e}",
+                parent=self.root
+            )
