@@ -1,5 +1,3 @@
-import os
-import json
 import pytest
 from src.storage import Storage
 
