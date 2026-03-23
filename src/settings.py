@@ -4,6 +4,7 @@ import os
 DEFAULTS = {
     "email": "",
     "default_pause": 30,
+    "recipient": "",
 }
 
 class Settings:

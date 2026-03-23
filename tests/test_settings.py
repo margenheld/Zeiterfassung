@@ -33,3 +33,6 @@ def test_corrupted_file(tmp_path):
     s = Settings(path)
     assert s.get("email") == ""
     assert s.get("default_pause") == 30
+
+def test_recipient_default(tmp_settings):
+    assert tmp_settings.get("recipient") == ""
