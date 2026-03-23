@@ -9,6 +9,7 @@ from src.storage import Storage
 from src.time_utils import calculate_hours, validate_entry
 from src.report import generate_report
 from src.mail import get_gmail_service, send_email
+from src.autostart import enable_autostart, disable_autostart
 
 DAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 MONTHS_DE = [
@@ -190,14 +191,49 @@ class App:
             highlightcolor=ACCENT, highlightthickness=1
         ).grid(row=2, column=1, padx=10, pady=8)
 
+        # Autostart
+        autostart_var = tk.BooleanVar(value=self.settings.get("autostart"))
+        tk.Checkbutton(
+            dialog, text="Autostart (minimiert bei Anmeldung)",
+            variable=autostart_var, font=FONT,
+            bg=BG, fg=TEXT, selectcolor=CELL_BG,
+            activebackground=BG, activeforeground=TEXT,
+            cursor="hand2"
+        ).grid(row=3, column=0, columnspan=2, padx=10, pady=8, sticky="w")
+
         def save_settings():
+            new_autostart = autostart_var.get()
+            old_autostart = self.settings.get("autostart")
+
+            if new_autostart != old_autostart:
+                try:
+                    if new_autostart:
+                        if getattr(sys, "frozen", False):
+                            target = sys.executable
+                            arguments = "--minimized"
+                        else:
+                            target = sys.executable
+                            main_py = os.path.join(self.base_path, "src", "main.py")
+                            arguments = f"{main_py} --minimized"
+                        enable_autostart(target, arguments)
+                    else:
+                        disable_autostart()
+                    self.settings.set("autostart", new_autostart)
+                except Exception as e:
+                    messagebox.showerror(
+                        "Autostart-Fehler",
+                        f"Autostart konnte nicht geändert werden:\n{e}",
+                        parent=dialog
+                    )
+                    return
+
             self.settings.set("email", email_var.get())
             self.settings.set("default_pause", int(pause_var.get()))
             self.settings.set("recipient", recipient_var.get())
             dialog.destroy()
 
         btn_frame = tk.Frame(dialog, bg=BG)
-        btn_frame.grid(row=3, column=0, columnspan=2, pady=12)
+        btn_frame.grid(row=4, column=0, columnspan=2, pady=12)
 
         tk.Button(
             btn_frame, text="Speichern", command=save_settings, font=FONT_BOLD,
