@@ -1,6 +1,6 @@
 # src/ui.py
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import calendar
 import datetime
 from src.storage import Storage
@@ -25,6 +25,9 @@ FONT = ("Segoe UI", 10)
 FONT_BOLD = ("Segoe UI", 10, "bold")
 FONT_HEADER = ("Segoe UI", 16, "bold")
 FONT_FOOTER = ("Segoe UI", 12, "bold")
+
+# Time dropdown values (5-min steps, 00:00 - 23:55)
+TIME_VALUES = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 5)]
 
 
 class App:
@@ -167,33 +170,52 @@ class App:
 
         entry = self.storage.get(date_str)
 
-        tk.Label(
-            dialog, text="Start (HH:MM):", font=FONT,
-            bg=BG, fg=TEXT
-        ).grid(row=0, column=0, padx=10, pady=8)
-
-        start_var = tk.StringVar(value=entry["start"] if entry else "")
-        start_entry = tk.Entry(
-            dialog, textvariable=start_var, width=10, font=FONT,
-            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
-            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
-            highlightcolor=ACCENT, highlightthickness=1
+        # Style ttk Combobox for dark theme
+        style = ttk.Style(dialog)
+        style.theme_use("clam")
+        style.configure(
+            "Dark.TCombobox",
+            fieldbackground=CELL_BG, background=CELL_BG,
+            foreground=TEXT, arrowcolor=ACCENT,
+            bordercolor=TEXT_MUTED, lightcolor=CELL_BG, darkcolor=CELL_BG,
+            selectbackground=ENTRY_BG, selectforeground=TEXT
         )
-        start_entry.grid(row=0, column=1, padx=10, pady=8)
+        style.map("Dark.TCombobox",
+            fieldbackground=[("readonly", CELL_BG)],
+            selectbackground=[("readonly", CELL_BG)],
+            selectforeground=[("readonly", TEXT)],
+            bordercolor=[("focus", ACCENT)],
+        )
+        # Style the dropdown listbox
+        dialog.option_add("*TCombobox*Listbox.background", CELL_BG)
+        dialog.option_add("*TCombobox*Listbox.foreground", TEXT)
+        dialog.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
+        dialog.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
+        dialog.option_add("*TCombobox*Listbox.font", FONT)
 
         tk.Label(
-            dialog, text="Ende (HH:MM):", font=FONT,
+            dialog, text="Start:", font=FONT,
             bg=BG, fg=TEXT
-        ).grid(row=1, column=0, padx=10, pady=8)
+        ).grid(row=0, column=0, padx=10, pady=8, sticky="w")
 
-        end_var = tk.StringVar(value=entry["end"] if entry else "")
-        end_entry = tk.Entry(
-            dialog, textvariable=end_var, width=10, font=FONT,
-            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
-            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
-            highlightcolor=ACCENT, highlightthickness=1
+        start_var = tk.StringVar(value=entry["start"] if entry else "08:00")
+        start_cb = ttk.Combobox(
+            dialog, textvariable=start_var, values=TIME_VALUES,
+            width=8, font=FONT, style="Dark.TCombobox", state="readonly"
         )
-        end_entry.grid(row=1, column=1, padx=10, pady=8)
+        start_cb.grid(row=0, column=1, padx=10, pady=8)
+
+        tk.Label(
+            dialog, text="Ende:", font=FONT,
+            bg=BG, fg=TEXT
+        ).grid(row=1, column=0, padx=10, pady=8, sticky="w")
+
+        end_var = tk.StringVar(value=entry["end"] if entry else "17:00")
+        end_cb = ttk.Combobox(
+            dialog, textvariable=end_var, values=TIME_VALUES,
+            width=8, font=FONT, style="Dark.TCombobox", state="readonly"
+        )
+        end_cb.grid(row=1, column=1, padx=10, pady=8)
 
         def save():
             ok, msg = validate_entry(start_var.get(), end_var.get())
