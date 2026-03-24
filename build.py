@@ -8,6 +8,8 @@ def build():
         "--onefile",
         "--noconsole",
         "--name", "Zeiterfassung",
+        "--icon", "assets/margenheld-icon.ico",
+        "--add-data", "assets;assets",
         "src/main.py",
     ]
     subprocess.run(cmd, check=True)
