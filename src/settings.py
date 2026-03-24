@@ -6,6 +6,11 @@ DEFAULTS = {
     "default_pause": 30,
     "recipient": "",
     "autostart": False,
+    "name": "",
+    "mail_subject": "Zeiterfassung — {zeitraum}",
+    "mail_greeting": "Sehr geehrte Damen und Herren,",
+    "mail_content": "anbei erhalten Sie meine Zeiterfassung für den Zeitraum {zeitraum}.",
+    "mail_closing": "Mit freundlichen Grüßen",
 }
 
 class Settings:

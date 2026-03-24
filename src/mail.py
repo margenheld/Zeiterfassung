@@ -2,6 +2,8 @@
 import os
 import base64
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
@@ -43,14 +45,27 @@ def get_gmail_service(credentials_path="credentials.json", token_path="token.jso
     return build("gmail", "v1", credentials=creds)
 
 
-def send_email(service, to, subject, html_body):
-    """Send an HTML email via Gmail API.
+def send_email(service, to, subject, html_body, pdf_bytes=None, pdf_filename=None):
+    """Send an HTML email via Gmail API, optionally with a PDF attachment.
 
     Returns the sent message id, or raises an exception on failure.
     """
-    message = MIMEText(html_body, "html")
-    message["to"] = to
-    message["subject"] = subject
+    if pdf_bytes:
+        message = MIMEMultipart()
+        message["to"] = to
+        message["subject"] = subject
+        message.attach(MIMEText(html_body, "html"))
+
+        attachment = MIMEApplication(pdf_bytes, _subtype="pdf")
+        attachment.add_header(
+            "Content-Disposition", "attachment",
+            filename=pdf_filename or "Zeiterfassung.pdf"
+        )
+        message.attach(attachment)
+    else:
+        message = MIMEText(html_body, "html")
+        message["to"] = to
+        message["subject"] = subject
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     body = {"raw": raw}
