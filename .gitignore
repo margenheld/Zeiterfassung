@@ -9,3 +9,5 @@ settings.json
 dist/
 build/
 *.spec
+.claude/
+.superpowers/
