@@ -2,12 +2,13 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 import calendar
+import ctypes
 import datetime
 import os
 import sys
 from src.storage import Storage
 from src.time_utils import calculate_hours, validate_entry
-from src.report import generate_report
+from src.report import generate_report, generate_pdf
 from src.mail import get_gmail_service, send_email
 from src.autostart import enable_autostart, disable_autostart
 
@@ -46,6 +47,24 @@ class App:
         self.base_path = base_path
         self.root.title("Zeiterfassung")
         self.root.configure(bg=BG)
+
+        # Set unique AppUserModelID so Windows shows our icon in taskbar
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("margenheld.zeiterfassung")
+        except Exception:
+            pass
+
+        # Set window/taskbar icon
+        ico_path = os.path.join(base_path, "assets", "margenheld-icon.ico")
+        png_path = os.path.join(base_path, "assets", "margenheld-icon.png")
+        if os.path.exists(ico_path):
+            self.root.iconbitmap(ico_path)
+        if os.path.exists(png_path):
+            icon = tk.PhotoImage(file=png_path)
+            self.root.iconphoto(True, icon)
+            self._icon_ref = icon
+
+        self.root.resizable(False, False)
 
         today = datetime.date.today()
         self.year = today.year
@@ -191,6 +210,75 @@ class App:
             highlightcolor=ACCENT, highlightthickness=1
         ).grid(row=2, column=1, padx=10, pady=8)
 
+        # Name
+        tk.Label(
+            dialog, text="Name:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=3, column=0, padx=10, pady=8, sticky="w")
+
+        name_var = tk.StringVar(value=self.settings.get("name"))
+        tk.Entry(
+            dialog, textvariable=name_var, width=25, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1
+        ).grid(row=3, column=1, padx=10, pady=8)
+
+        # Mail-Vorlage
+        tk.Label(
+            dialog, text="— Mail-Vorlage —", font=FONT_BOLD, bg=BG, fg=TEXT_MUTED
+        ).grid(row=4, column=0, columnspan=2, padx=10, pady=(16, 4))
+
+        tk.Label(
+            dialog, text="Betreff:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=5, column=0, padx=10, pady=4, sticky="w")
+        subject_var = tk.StringVar(value=self.settings.get("mail_subject"))
+        tk.Entry(
+            dialog, textvariable=subject_var, width=35, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1
+        ).grid(row=5, column=1, padx=10, pady=4)
+
+        tk.Label(
+            dialog, text="Anrede:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=6, column=0, padx=10, pady=4, sticky="w")
+        greeting_var = tk.StringVar(value=self.settings.get("mail_greeting"))
+        tk.Entry(
+            dialog, textvariable=greeting_var, width=35, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1
+        ).grid(row=6, column=1, padx=10, pady=4)
+
+        tk.Label(
+            dialog, text="Inhalt:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=7, column=0, padx=10, pady=4, sticky="nw")
+        content_text = tk.Text(
+            dialog, width=35, height=3, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1, wrap=tk.WORD
+        )
+        content_text.grid(row=7, column=1, padx=10, pady=4)
+        content_text.insert("1.0", self.settings.get("mail_content"))
+
+        tk.Label(
+            dialog, text="Gruß:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=8, column=0, padx=10, pady=4, sticky="nw")
+        closing_text = tk.Text(
+            dialog, width=35, height=2, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1, wrap=tk.WORD
+        )
+        closing_text.grid(row=8, column=1, padx=10, pady=4)
+        closing_text.insert("1.0", self.settings.get("mail_closing"))
+
+        tk.Label(
+            dialog, text="Platzhalter: {zeitraum}, {gesamt}", font=("Segoe UI", 8),
+            bg=BG, fg=TEXT_MUTED
+        ).grid(row=9, column=0, columnspan=2, padx=10, pady=(0, 4))
+
         # Autostart
         autostart_var = tk.BooleanVar(value=self.settings.get("autostart"))
         tk.Checkbutton(
@@ -199,7 +287,7 @@ class App:
             bg=BG, fg=TEXT, selectcolor=CELL_BG,
             activebackground=BG, activeforeground=TEXT,
             cursor="hand2"
-        ).grid(row=3, column=0, columnspan=2, padx=10, pady=8, sticky="w")
+        ).grid(row=10, column=0, columnspan=2, padx=10, pady=8, sticky="w")
 
         def save_settings():
             new_autostart = autostart_var.get()
@@ -230,10 +318,15 @@ class App:
             self.settings.set("email", email_var.get())
             self.settings.set("default_pause", int(pause_var.get()))
             self.settings.set("recipient", recipient_var.get())
+            self.settings.set("name", name_var.get())
+            self.settings.set("mail_subject", subject_var.get())
+            self.settings.set("mail_greeting", greeting_var.get())
+            self.settings.set("mail_content", content_text.get("1.0", "end-1c"))
+            self.settings.set("mail_closing", closing_text.get("1.0", "end-1c"))
             dialog.destroy()
 
         btn_frame = tk.Frame(dialog, bg=BG)
-        btn_frame.grid(row=4, column=0, columnspan=2, pady=12)
+        btn_frame.grid(row=11, column=0, columnspan=2, pady=12)
 
         tk.Button(
             btn_frame, text="Speichern", command=save_settings, font=FONT_BOLD,
@@ -525,7 +618,15 @@ class App:
                 return
 
             entries = self.storage.get_all()
-            html = generate_report(date_from, date_to, entries)
+
+            greeting = self.settings.get("mail_greeting")
+            content = self.settings.get("mail_content")
+            closing = self.settings.get("mail_closing")
+
+            html, total = generate_report(
+                date_from, date_to, entries,
+                greeting=greeting, content=content, closing=closing
+            )
 
             if html is None:
                 messagebox.showinfo(
@@ -535,10 +636,16 @@ class App:
                 )
                 return
 
+            pdf_bytes = generate_pdf(date_from, date_to, entries, name=self.settings.get("name"))
+            label = f"{date_from.strftime('%d.%m.%Y')} – {date_to.strftime('%d.%m.%Y')}"
+
             try:
                 service = get_gmail_service(credentials_path, token_path)
-                subject = f"Zeiterfassung — {date_from.strftime('%d.%m.%Y')} – {date_to.strftime('%d.%m.%Y')}"
-                send_email(service, recipient, subject, html)
+                subject_template = self.settings.get("mail_subject")
+                subject = subject_template.replace("{zeitraum}", label).replace("{gesamt}", f"{total}h")
+                pdf_filename = f"Zeiterfassung_{date_from.strftime('%Y%m%d')}_{date_to.strftime('%Y%m%d')}.pdf"
+                send_email(service, recipient, subject, html,
+                           pdf_bytes=pdf_bytes, pdf_filename=pdf_filename)
                 dialog.destroy()
                 messagebox.showinfo(
                     "Gesendet",
