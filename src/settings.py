@@ -3,6 +3,8 @@ import os
 
 DEFAULTS = {
     "email": "",
+    "default_start": "08:00",
+    "default_end": "16:00",
     "default_pause": 30,
     "recipient": "",
     "autostart": False,
@@ -11,6 +13,7 @@ DEFAULTS = {
     "mail_greeting": "Sehr geehrte Damen und Herren,",
     "mail_content": "anbei erhalten Sie meine Zeiterfassung für den Zeitraum {zeitraum}.",
     "mail_closing": "Mit freundlichen Grüßen",
+    "hourly_rate": 0.0,
 }
 
 class Settings:

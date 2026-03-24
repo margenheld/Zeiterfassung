@@ -11,6 +11,7 @@ from src.time_utils import calculate_hours, validate_entry
 from src.report import generate_report, generate_pdf
 from src.mail import get_gmail_service, send_email
 from src.autostart import enable_autostart, disable_autostart
+from src.version import VERSION
 
 DAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 MONTHS_DE = [
@@ -28,9 +29,16 @@ TEXT_MUTED = "#888888"
 ENTRY_BG = "#1a3a5c"
 WEEKEND_ENTRY_BG = "#1a3050"
 FONT = ("Segoe UI", 10)
+FONT_SMALL = ("Segoe UI", 8)
 FONT_BOLD = ("Segoe UI", 10, "bold")
 FONT_HEADER = ("Segoe UI", 16, "bold")
 FONT_FOOTER = ("Segoe UI", 12, "bold")
+
+# Hover colors (slightly lighter variants)
+CELL_BG_HOVER = "#1e2d52"
+WEEKEND_BG_HOVER = "#153a6e"
+ENTRY_BG_HOVER = "#224a70"
+WEEKEND_ENTRY_BG_HOVER = "#223e60"
 
 # Time dropdown values (5-min steps, 00:00 - 23:55)
 TIME_VALUES = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 5)]
@@ -45,7 +53,7 @@ class App:
         self.storage = storage
         self.settings = settings
         self.base_path = base_path
-        self.root.title("Zeiterfassung")
+        self.root.title(f"Zeiterfassung v{VERSION}")
         self.root.configure(bg=BG)
 
         # Set unique AppUserModelID so Windows shows our icon in taskbar
@@ -186,21 +194,43 @@ class App:
             highlightcolor=ACCENT, highlightthickness=1
         ).grid(row=0, column=1, padx=10, pady=8)
 
+        # Default start time
+        tk.Label(
+            dialog, text="Standard-Start:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=1, column=0, padx=10, pady=8, sticky="w")
+
+        start_var = tk.StringVar(value=self.settings.get("default_start"))
+        ttk.Combobox(
+            dialog, textvariable=start_var, values=TIME_VALUES,
+            width=8, font=FONT, style="Dark.TCombobox", state="readonly"
+        ).grid(row=1, column=1, padx=10, pady=8)
+
+        # Default end time
+        tk.Label(
+            dialog, text="Standard-Ende:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=2, column=0, padx=10, pady=8, sticky="w")
+
+        end_var = tk.StringVar(value=self.settings.get("default_end"))
+        ttk.Combobox(
+            dialog, textvariable=end_var, values=TIME_VALUES,
+            width=8, font=FONT, style="Dark.TCombobox", state="readonly"
+        ).grid(row=2, column=1, padx=10, pady=8)
+
         # Default pause
         tk.Label(
             dialog, text="Standard-Pause (Min):", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=1, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=3, column=0, padx=10, pady=8, sticky="w")
 
         pause_var = tk.StringVar(value=str(self.settings.get("default_pause")))
         ttk.Combobox(
             dialog, textvariable=pause_var, values=PAUSE_VALUES,
             width=8, font=FONT, style="Dark.TCombobox", state="readonly"
-        ).grid(row=1, column=1, padx=10, pady=8)
+        ).grid(row=3, column=1, padx=10, pady=8)
 
         # Recipient
         tk.Label(
             dialog, text="Empfänger:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=2, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=4, column=0, padx=10, pady=8, sticky="w")
 
         recipient_var = tk.StringVar(value=self.settings.get("recipient"))
         tk.Entry(
@@ -208,12 +238,12 @@ class App:
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=2, column=1, padx=10, pady=8)
+        ).grid(row=4, column=1, padx=10, pady=8)
 
         # Name
         tk.Label(
             dialog, text="Name:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=3, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=5, column=0, padx=10, pady=8, sticky="w")
 
         name_var = tk.StringVar(value=self.settings.get("name"))
         tk.Entry(
@@ -221,63 +251,81 @@ class App:
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=3, column=1, padx=10, pady=8)
+        ).grid(row=5, column=1, padx=10, pady=8)
+
+        # Stundenlohn (optional)
+        tk.Label(
+            dialog, text="Stundenlohn (€):", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=6, column=0, padx=10, pady=8, sticky="w")
+
+        rate_var = tk.StringVar(value=str(self.settings.get("hourly_rate") or ""))
+        tk.Entry(
+            dialog, textvariable=rate_var, width=10, font=FONT,
+            bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+            relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+            highlightcolor=ACCENT, highlightthickness=1
+        ).grid(row=6, column=1, padx=10, pady=8, sticky="w")
+
+        tk.Label(
+            dialog, text="(optional – nur für dich sichtbar)", font=FONT_SMALL,
+            bg=BG, fg=TEXT_MUTED
+        ).grid(row=6, column=1, padx=(120, 10), pady=8, sticky="w")
 
         # Mail-Vorlage
         tk.Label(
             dialog, text="— Mail-Vorlage —", font=FONT_BOLD, bg=BG, fg=TEXT_MUTED
-        ).grid(row=4, column=0, columnspan=2, padx=10, pady=(16, 4))
+        ).grid(row=7, column=0, columnspan=2, padx=10, pady=(16, 4))
 
         tk.Label(
             dialog, text="Betreff:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=5, column=0, padx=10, pady=4, sticky="w")
+        ).grid(row=8, column=0, padx=10, pady=4, sticky="w")
         subject_var = tk.StringVar(value=self.settings.get("mail_subject"))
         tk.Entry(
             dialog, textvariable=subject_var, width=35, font=FONT,
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=5, column=1, padx=10, pady=4)
+        ).grid(row=8, column=1, padx=10, pady=4)
 
         tk.Label(
             dialog, text="Anrede:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=6, column=0, padx=10, pady=4, sticky="w")
+        ).grid(row=9, column=0, padx=10, pady=4, sticky="w")
         greeting_var = tk.StringVar(value=self.settings.get("mail_greeting"))
         tk.Entry(
             dialog, textvariable=greeting_var, width=35, font=FONT,
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=6, column=1, padx=10, pady=4)
+        ).grid(row=9, column=1, padx=10, pady=4)
 
         tk.Label(
             dialog, text="Inhalt:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=7, column=0, padx=10, pady=4, sticky="nw")
+        ).grid(row=10, column=0, padx=10, pady=4, sticky="nw")
         content_text = tk.Text(
             dialog, width=35, height=3, font=FONT,
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1, wrap=tk.WORD
         )
-        content_text.grid(row=7, column=1, padx=10, pady=4)
+        content_text.grid(row=10, column=1, padx=10, pady=4)
         content_text.insert("1.0", self.settings.get("mail_content"))
 
         tk.Label(
             dialog, text="Gruß:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=8, column=0, padx=10, pady=4, sticky="nw")
+        ).grid(row=11, column=0, padx=10, pady=4, sticky="nw")
         closing_text = tk.Text(
             dialog, width=35, height=2, font=FONT,
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1, wrap=tk.WORD
         )
-        closing_text.grid(row=8, column=1, padx=10, pady=4)
+        closing_text.grid(row=11, column=1, padx=10, pady=4)
         closing_text.insert("1.0", self.settings.get("mail_closing"))
 
         tk.Label(
             dialog, text="Platzhalter: {zeitraum}, {gesamt}", font=("Segoe UI", 8),
             bg=BG, fg=TEXT_MUTED
-        ).grid(row=9, column=0, columnspan=2, padx=10, pady=(0, 4))
+        ).grid(row=12, column=0, columnspan=2, padx=10, pady=(0, 4))
 
         # Autostart
         autostart_var = tk.BooleanVar(value=self.settings.get("autostart"))
@@ -287,9 +335,14 @@ class App:
             bg=BG, fg=TEXT, selectcolor=CELL_BG,
             activebackground=BG, activeforeground=TEXT,
             cursor="hand2"
-        ).grid(row=10, column=0, columnspan=2, padx=10, pady=8, sticky="w")
+        ).grid(row=13, column=0, columnspan=2, padx=10, pady=8, sticky="w")
 
         def save_settings():
+            ok, msg = validate_entry(start_var.get(), end_var.get())
+            if not ok:
+                messagebox.showerror("Standard-Arbeitszeit ungültig", msg, parent=dialog)
+                return
+
             new_autostart = autostart_var.get()
             old_autostart = self.settings.get("autostart")
 
@@ -316,6 +369,8 @@ class App:
                     return
 
             self.settings.set("email", email_var.get())
+            self.settings.set("default_start", start_var.get())
+            self.settings.set("default_end", end_var.get())
             self.settings.set("default_pause", int(pause_var.get()))
             self.settings.set("recipient", recipient_var.get())
             self.settings.set("name", name_var.get())
@@ -323,10 +378,16 @@ class App:
             self.settings.set("mail_greeting", greeting_var.get())
             self.settings.set("mail_content", content_text.get("1.0", "end-1c"))
             self.settings.set("mail_closing", closing_text.get("1.0", "end-1c"))
+            rate_str = rate_var.get().strip()
+            try:
+                self.settings.set("hourly_rate", float(rate_str) if rate_str else 0.0)
+            except ValueError:
+                self.settings.set("hourly_rate", 0.0)
+            self._refresh()
             dialog.destroy()
 
         btn_frame = tk.Frame(dialog, bg=BG)
-        btn_frame.grid(row=11, column=0, columnspan=2, pady=12)
+        btn_frame.grid(row=14, column=0, columnspan=2, pady=12)
 
         tk.Button(
             btn_frame, text="Speichern", command=save_settings, font=FONT_BOLD,
@@ -345,14 +406,14 @@ class App:
     def _refresh(self):
         self.header_label.config(text=f"{MONTHS_DE[self.month]} {self.year}")
 
-        for widget in self.grid_frame.winfo_children():
-            widget.destroy()
+        # Build new grid off-screen, then swap to avoid flicker
+        new_frame = tk.Frame(self.root, bg=BG)
 
         # Column headers
         for col, day_name in enumerate(DAYS_DE):
             fg = TEXT_MUTED if col < 5 else "#6c6c80"
             lbl = tk.Label(
-                self.grid_frame, text=day_name, font=FONT_BOLD,
+                new_frame, text=day_name, font=FONT_BOLD,
                 bg=BG, fg=fg
             )
             lbl.grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
@@ -366,7 +427,7 @@ class App:
             for col, day in enumerate(week):
                 if day == 0:
                     lbl = tk.Label(
-                        self.grid_frame, text="", bg=BG, relief=tk.FLAT
+                        new_frame, text="", bg=BG, relief=tk.FLAT
                     )
                     lbl.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
                     continue
@@ -383,30 +444,71 @@ class App:
                 if entry:
                     pause = entry.get("pause", 0)
                     hours = calculate_hours(entry["start"], entry["end"], pause_minutes=pause)
-                    text += f"\n{hours}h"
                     total_hours += hours
                     bg = WEEKEND_ENTRY_BG if is_weekend else ENTRY_BG
-                    cell = tk.Label(
-                        self.grid_frame, text=text, font=FONT,
-                        bg=bg, fg=TEXT, relief=tk.SOLID,
+                    cell = tk.Frame(
+                        new_frame, bg=bg, relief=tk.SOLID,
                         highlightbackground=ACCENT, highlightthickness=1,
-                        width=8, height=3, cursor="hand2"
+                        cursor="hand2"
                     )
+                    day_lbl = tk.Label(
+                        cell, text=str(day), font=FONT,
+                        bg=bg, fg=TEXT, cursor="hand2"
+                    )
+                    day_lbl.pack(pady=(4, 0))
+                    time_lbl = tk.Label(
+                        cell, text=f"{entry['start']}-{entry['end']}",
+                        font=FONT_SMALL, bg=bg, fg=TEXT_MUTED, cursor="hand2"
+                    )
+                    time_lbl.pack(pady=(0, 4))
+                    hover_bg = WEEKEND_ENTRY_BG_HOVER if is_weekend else ENTRY_BG_HOVER
+                    for w in (cell, day_lbl, time_lbl):
+                        w.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
+                        w.bind("<Button-3>", lambda e, d=date_str: self._delete_entry(d))
+                        w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
+                        w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
                 else:
                     bg = WEEKEND_BG if is_weekend else CELL_BG
+                    hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
                     cell = tk.Label(
-                        self.grid_frame, text=text, font=FONT,
+                        new_frame, text=text, font=FONT,
                         bg=bg, fg=fg, relief=tk.FLAT,
                         width=8, height=3, cursor="hand2"
                     )
+                    cell.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
+                    cell.bind("<Enter>", lambda e, c=cell, hb=hover_bg: c.config(bg=hb))
+                    cell.bind("<Leave>", lambda e, c=cell, ob=bg: c.config(bg=ob))
 
                 cell.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
-                cell.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
-
-        self.footer_label.config(text=f"Gesamt: {round(total_hours, 2)}h")
 
         for col in range(7):
-            self.grid_frame.columnconfigure(col, weight=1)
+            new_frame.columnconfigure(col, weight=1)
+
+        # Swap frames: destroy old, place new
+        self.grid_frame.destroy()
+        self.grid_frame = new_frame
+        self.grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5,
+                             before=self.footer_label.master)
+
+        rate = self.settings.get("hourly_rate") or 0
+        if rate > 0:
+            brutto = round(total_hours * rate, 2)
+            self.footer_label.config(
+                text=f"Gesamt: {round(total_hours, 2)}h  —  {brutto:.2f} € brutto"
+            )
+        else:
+            self.footer_label.config(text=f"Gesamt: {round(total_hours, 2)}h")
+
+    @staticmethod
+    def _cell_hover(frame, day_lbl, time_lbl, bg):
+        frame.config(bg=bg)
+        day_lbl.config(bg=bg)
+        time_lbl.config(bg=bg)
+
+    def _delete_entry(self, date_str):
+        if messagebox.askyesno("Eintrag löschen", f"Eintrag für {date_str} löschen?"):
+            self.storage.delete(date_str)
+            self._refresh()
 
     def _open_dialog(self, date_str):
         dialog = tk.Toplevel(self.root)
@@ -424,7 +526,7 @@ class App:
             bg=BG, fg=TEXT
         ).grid(row=0, column=0, padx=10, pady=8, sticky="w")
 
-        start_var = tk.StringVar(value=entry["start"] if entry else "08:00")
+        start_var = tk.StringVar(value=entry["start"] if entry else self.settings.get("default_start"))
         start_cb = ttk.Combobox(
             dialog, textvariable=start_var, values=TIME_VALUES,
             width=8, font=FONT, style="Dark.TCombobox", state="readonly"
@@ -436,7 +538,7 @@ class App:
             bg=BG, fg=TEXT
         ).grid(row=1, column=0, padx=10, pady=8, sticky="w")
 
-        end_var = tk.StringVar(value=entry["end"] if entry else "17:00")
+        end_var = tk.StringVar(value=entry["end"] if entry else self.settings.get("default_end"))
         end_cb = ttk.Combobox(
             dialog, textvariable=end_var, values=TIME_VALUES,
             width=8, font=FONT, style="Dark.TCombobox", state="readonly"
@@ -463,7 +565,7 @@ class App:
         pause_cb.grid(row=2, column=1, padx=10, pady=8)
 
         def save():
-            ok, msg = validate_entry(start_var.get(), end_var.get())
+            ok, msg = validate_entry(start_var.get(), end_var.get(), pause_minutes=int(pause_var.get()))
             if not ok:
                 messagebox.showerror("Fehler", msg, parent=dialog)
                 return
@@ -530,16 +632,25 @@ class App:
         if today.month == 1:
             from_default = today.replace(year=today.year - 1, month=12)
         else:
-            # Handle months where from-day exceeds target month length
-            import calendar as cal_mod
             from_month = today.month - 1
             from_year = today.year
-            max_day = cal_mod.monthrange(from_year, from_month)[1]
+            max_day = calendar.monthrange(from_year, from_month)[1]
             from_default = today.replace(month=from_month, day=min(today.day, max_day))
-
-        day_values = [str(d) for d in range(1, 32)]
         month_values = [str(m) for m in range(1, 13)]
         year_values = [str(y) for y in range(2020, today.year + 2)]
+
+        def update_day_values(day_cb, day_var, month_var, year_var):
+            """Update day combobox values based on selected month/year."""
+            try:
+                m = int(month_var.get())
+                y = int(year_var.get())
+                max_day = calendar.monthrange(y, m)[1]
+            except (ValueError, KeyError):
+                max_day = 31
+            new_values = [str(d) for d in range(1, max_day + 1)]
+            day_cb["values"] = new_values
+            if int(day_var.get()) > max_day:
+                day_var.set(str(max_day))
 
         # Von
         tk.Label(
@@ -547,8 +658,10 @@ class App:
         ).grid(row=0, column=0, padx=(10, 5), pady=8, sticky="w")
 
         from_day_var = tk.StringVar(value=str(from_default.day))
+        from_max = calendar.monthrange(from_default.year, from_default.month)[1]
         from_day_cb = ttk.Combobox(
-            dialog, textvariable=from_day_var, values=day_values,
+            dialog, textvariable=from_day_var,
+            values=[str(d) for d in range(1, from_max + 1)],
             width=3, font=FONT, style="Dark.TCombobox", state="readonly"
         )
         from_day_cb.grid(row=0, column=1, padx=2, pady=8)
@@ -571,14 +684,19 @@ class App:
         )
         from_year_cb.grid(row=0, column=5, padx=(2, 10), pady=8)
 
+        from_month_var.trace_add("write", lambda *_: update_day_values(from_day_cb, from_day_var, from_month_var, from_year_var))
+        from_year_var.trace_add("write", lambda *_: update_day_values(from_day_cb, from_day_var, from_month_var, from_year_var))
+
         # Bis
         tk.Label(
             dialog, text="Bis:", font=FONT, bg=BG, fg=TEXT
         ).grid(row=1, column=0, padx=(10, 5), pady=8, sticky="w")
 
         to_day_var = tk.StringVar(value=str(today.day))
+        to_max = calendar.monthrange(today.year, today.month)[1]
         to_day_cb = ttk.Combobox(
-            dialog, textvariable=to_day_var, values=day_values,
+            dialog, textvariable=to_day_var,
+            values=[str(d) for d in range(1, to_max + 1)],
             width=3, font=FONT, style="Dark.TCombobox", state="readonly"
         )
         to_day_cb.grid(row=1, column=1, padx=2, pady=8)
@@ -600,6 +718,9 @@ class App:
             width=5, font=FONT, style="Dark.TCombobox", state="readonly"
         )
         to_year_cb.grid(row=1, column=5, padx=(2, 10), pady=8)
+
+        to_month_var.trace_add("write", lambda *_: update_day_values(to_day_cb, to_day_var, to_month_var, to_year_var))
+        to_year_var.trace_add("write", lambda *_: update_day_values(to_day_cb, to_day_var, to_month_var, to_year_var))
 
         def do_send():
             try:

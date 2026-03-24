@@ -19,9 +19,9 @@ def calculate_hours(start_str, end_str, pause_minutes=0):
         return 0.0
     start_min = start[0] * 60 + start[1]
     end_min = end[0] * 60 + end[1]
-    return round((end_min - start_min - pause_minutes) / 60, 2)
+    return max(0.0, round((end_min - start_min - pause_minutes) / 60, 2))
 
-def validate_entry(start_str, end_str):
+def validate_entry(start_str, end_str, pause_minutes=0):
     """Validate a time entry. Returns (ok, error_message)."""
     start = parse_time(start_str)
     if start is None:
@@ -33,4 +33,9 @@ def validate_entry(start_str, end_str):
     end_min = end[0] * 60 + end[1]
     if end_min <= start_min:
         return False, "Endzeit muss nach Startzeit liegen"
+    working_min = end_min - start_min
+    if pause_minutes < 0:
+        return False, "Pause darf nicht negativ sein"
+    if pause_minutes >= working_min:
+        return False, f"Pause ({pause_minutes} Min) muss kleiner als die Arbeitszeit ({working_min} Min) sein"
     return True, ""
