@@ -50,5 +50,16 @@ def get_week_dates(iso_year, iso_week):
 
 
 def get_week_label(iso_year, iso_week):
-    """Return display label like 'KW 14 · 2026'."""
-    return f"KW {iso_week} · {iso_year}"
+    """Return display label like 'KW 14 · 30.03. – 05.04.2026'."""
+    dates = get_week_dates(iso_year, iso_week)
+    monday = dates[0]
+    sunday = dates[6]
+    if monday.year != sunday.year:
+        return f"KW {iso_week} · {monday.strftime('%d.%m.%Y')} – {sunday.strftime('%d.%m.%Y')}"
+    return f"KW {iso_week} · {monday.strftime('%d.%m.')} – {sunday.strftime('%d.%m.%Y')}"
+
+
+def week_spans_months(iso_year, iso_week):
+    """Return True if the week spans two different months."""
+    dates = get_week_dates(iso_year, iso_week)
+    return dates[0].month != dates[6].month

@@ -7,7 +7,7 @@ import datetime
 import os
 import sys
 from src.storage import Storage
-from src.time_utils import calculate_hours, validate_entry, get_week_dates, get_week_label
+from src.time_utils import calculate_hours, validate_entry, get_week_dates, get_week_label, week_spans_months
 from src.report import generate_report, generate_pdf
 from src.mail import get_gmail_service, send_email
 from src.autostart import enable_autostart, disable_autostart
@@ -589,12 +589,13 @@ class App:
         dates = get_week_dates(self.iso_year, self.current_week)
         entries = self.storage.get_all()
         total_hours = 0.0
+        spans = week_spans_months(self.iso_year, self.current_week)
 
         for col, day_date in enumerate(dates):
             date_str = day_date.isoformat()
             entry = entries.get(date_str)
             is_weekend = col >= 5
-            day_num = day_date.day
+            day_text = f"{day_date.day}.{day_date.month}." if spans else str(day_date.day)
 
             fg = TEXT
             if is_weekend and not entry:
@@ -611,7 +612,7 @@ class App:
                     cursor="hand2"
                 )
                 day_lbl = tk.Label(
-                    cell, text=str(day_num), font=FONT,
+                    cell, text=day_text, font=FONT,
                     bg=bg, fg=TEXT, cursor="hand2"
                 )
                 day_lbl.pack(pady=(8, 0))
@@ -630,7 +631,7 @@ class App:
                 bg = WEEKEND_BG if is_weekend else CELL_BG
                 hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
                 cell = tk.Label(
-                    new_frame, text=str(day_num), font=FONT,
+                    new_frame, text=day_text, font=FONT,
                     bg=bg, fg=fg, relief=tk.FLAT,
                     width=8, height=5, cursor="hand2"
                 )
