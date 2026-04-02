@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+jobs:
+  release:
+    if: >
+      github.event.pull_request.merged == true &&
+      (contains(github.event.pull_request.labels.*.name, 'release:major') ||
+       contains(github.event.pull_request.labels.*.name, 'release:minor') ||
+       contains(github.event.pull_request.labels.*.name, 'release:patch'))
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Determine bump type
+        id: bump
+        shell: bash
+        run: |
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          if echo "$LABELS" | grep -q "release:major"; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "release:minor"; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version
+        id: version
+        shell: bash
+        run: |
+          CURRENT=$(python -c "from src.version import VERSION; print(VERSION)")
+          IFS='.' read -r major minor patch <<< "$CURRENT"
+          case "${{ steps.bump.outputs.type }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          NEW="${major}.${minor}.${patch}"
+          echo "VERSION = \"${NEW}\"" > src/version.py
+          echo "version=${NEW}" >> "$GITHUB_OUTPUT"
+          echo "Bumped ${CURRENT} → ${NEW}"
+
+      - name: Commit version bump
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/version.py
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+          git push
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Build exe
+        run: |
+          pyinstaller --onefile --noconsole --name Zeiterfassung --icon assets/margenheld-icon.ico --add-data "assets;assets" src/main.py
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: |
+          $url = "https://jrsoftware.org/download.php/is.exe"
+          Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\innosetup.exe"
+          Start-Process -FilePath "$env:TEMP\innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=C:\InnoSetup" -Wait
+
+      - name: Build installer
+        shell: cmd
+        run: |
+          C:\InnoSetup\ISCC.exe /DAppVer=${{ steps.version.outputs.version }} installer.iss
+
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            dist/Zeiterfassung_Setup.exe \
+            --title "Zeiterfassung v${{ steps.version.outputs.version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
