@@ -468,8 +468,16 @@ class App:
         ).pack(side=tk.LEFT, padx=5)
 
     def _refresh(self):
-        self.header_label.config(text=f"{MONTHS_DE[self.month]} {self.year}")
+        if self.view_mode == "month":
+            self.header_label.config(text=f"{MONTHS_DE[self.month]} {self.year}")
+            self._refresh_month()
+        else:
+            self.header_label.config(
+                text=get_week_label(self.iso_year, self.current_week)
+            )
+            self._refresh_week()
 
+    def _refresh_month(self):
         # Build new grid off-screen, then swap to avoid flicker
         new_frame = tk.Frame(self.root, bg=BG)
 
@@ -554,6 +562,91 @@ class App:
         self.grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5,
                              before=self.footer_label.master)
 
+        rate = self.settings.get("hourly_rate") or 0
+        if rate > 0:
+            brutto = round(total_hours * rate, 2)
+            self.footer_label.config(
+                text=f"Gesamt: {round(total_hours, 2)}h  —  {brutto:.2f} € brutto"
+            )
+        else:
+            self.footer_label.config(text=f"Gesamt: {round(total_hours, 2)}h")
+
+    def _refresh_week(self):
+        new_frame = tk.Frame(self.root, bg=BG)
+
+        # Column headers
+        for col, day_name in enumerate(DAYS_DE):
+            fg = TEXT_MUTED if col < 5 else "#6c6c80"
+            lbl = tk.Label(
+                new_frame, text=day_name, font=FONT_BOLD,
+                bg=BG, fg=fg
+            )
+            lbl.grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
+
+        dates = get_week_dates(self.iso_year, self.current_week)
+        entries = self.storage.get_all()
+        total_hours = 0.0
+
+        for col, day_date in enumerate(dates):
+            date_str = day_date.isoformat()
+            entry = entries.get(date_str)
+            is_weekend = col >= 5
+            day_num = day_date.day
+
+            fg = TEXT
+            if is_weekend and not entry:
+                fg = "#6c6c80"
+
+            if entry:
+                pause = entry.get("pause", 0)
+                hours = calculate_hours(entry["start"], entry["end"], pause_minutes=pause)
+                total_hours += hours
+                bg = WEEKEND_ENTRY_BG if is_weekend else ENTRY_BG
+                cell = tk.Frame(
+                    new_frame, bg=bg, relief=tk.SOLID,
+                    highlightbackground=ACCENT, highlightthickness=1,
+                    cursor="hand2"
+                )
+                day_lbl = tk.Label(
+                    cell, text=str(day_num), font=FONT,
+                    bg=bg, fg=TEXT, cursor="hand2"
+                )
+                day_lbl.pack(pady=(8, 0))
+                time_lbl = tk.Label(
+                    cell, text=f"{entry['start']}-{entry['end']}",
+                    font=FONT_SMALL, bg=bg, fg=TEXT_MUTED, cursor="hand2"
+                )
+                time_lbl.pack(pady=(0, 8))
+                hover_bg = WEEKEND_ENTRY_BG_HOVER if is_weekend else ENTRY_BG_HOVER
+                for w in (cell, day_lbl, time_lbl):
+                    w.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
+                    w.bind("<Button-3>", lambda e, d=date_str: self._delete_entry(d))
+                    w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
+                    w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
+            else:
+                bg = WEEKEND_BG if is_weekend else CELL_BG
+                hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
+                cell = tk.Label(
+                    new_frame, text=str(day_num), font=FONT,
+                    bg=bg, fg=fg, relief=tk.FLAT,
+                    width=8, height=5, cursor="hand2"
+                )
+                cell.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
+                cell.bind("<Enter>", lambda e, c=cell, hb=hover_bg: c.config(bg=hb))
+                cell.bind("<Leave>", lambda e, c=cell, ob=bg: c.config(bg=ob))
+
+            cell.grid(row=1, column=col, sticky="nsew", padx=2, pady=2)
+
+        for col in range(7):
+            new_frame.columnconfigure(col, weight=1)
+
+        # Swap frames
+        self.grid_frame.destroy()
+        self.grid_frame = new_frame
+        self.grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5,
+                             before=self.footer_label.master)
+
+        # Footer
         rate = self.settings.get("hourly_rate") or 0
         if rate > 0:
             brutto = round(total_hours * rate, 2)
