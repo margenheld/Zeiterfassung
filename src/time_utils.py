@@ -1,3 +1,6 @@
+import datetime
+
+
 def parse_time(time_str):
     """Parse HH:MM string. Returns (hours, minutes) or None if invalid."""
     try:
@@ -39,3 +42,13 @@ def validate_entry(start_str, end_str, pause_minutes=0):
     if pause_minutes >= working_min:
         return False, f"Pause ({pause_minutes} Min) muss kleiner als die Arbeitszeit ({working_min} Min) sein"
     return True, ""
+
+def get_week_dates(iso_year, iso_week):
+    """Return list of 7 datetime.date objects (Mon-Sun) for the given ISO week."""
+    monday = datetime.date.fromisocalendar(iso_year, iso_week, 1)
+    return [monday + datetime.timedelta(days=i) for i in range(7)]
+
+
+def get_week_label(iso_year, iso_week):
+    """Return display label like 'KW 14 · 2026'."""
+    return f"KW {iso_week} · {iso_year}"
