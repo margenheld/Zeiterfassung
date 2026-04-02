@@ -476,6 +476,9 @@ class App:
                 text=get_week_label(self.iso_year, self.current_week)
             )
             self._refresh_week()
+        # Let tkinter compute the required size, then resize window
+        self.root.update_idletasks()
+        self.root.geometry("")
 
     def _refresh_month(self):
         # Build new grid off-screen, then swap to avoid flicker
