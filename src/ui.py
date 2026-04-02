@@ -7,7 +7,7 @@ import datetime
 import os
 import sys
 from src.storage import Storage
-from src.time_utils import calculate_hours, validate_entry
+from src.time_utils import calculate_hours, validate_entry, get_week_dates, get_week_label
 from src.report import generate_report, generate_pdf
 from src.mail import get_gmail_service, send_email
 from src.autostart import enable_autostart, disable_autostart
@@ -77,6 +77,10 @@ class App:
         today = datetime.date.today()
         self.year = today.year
         self.month = today.month
+        self.view_mode = "month"  # "month" or "week"
+        iso = today.isocalendar()
+        self.iso_year = iso[0]
+        self.current_week = iso[1]
 
         self._build_header()
         self._build_grid()
@@ -88,11 +92,31 @@ class App:
         frame.pack(fill=tk.X, padx=10, pady=(10, 0))
 
         tk.Button(
-            frame, text="\u2039", command=self._prev_month, width=3,
+            frame, text="\u2039", command=self._prev, width=3,
             font=FONT_BOLD, bg=CELL_BG, fg=ACCENT,
             activebackground=ENTRY_BG, activeforeground=ACCENT,
             relief=tk.FLAT, cursor="hand2"
         ).pack(side=tk.LEFT)
+
+        # Toggle switch frame
+        toggle_frame = tk.Frame(frame, bg=BG)
+        toggle_frame.pack(side=tk.LEFT, padx=10)
+
+        self.btn_month = tk.Button(
+            toggle_frame, text="Monat", command=lambda: self._set_view("month"),
+            font=FONT_SMALL, width=6, relief=tk.FLAT, cursor="hand2",
+            bg=ACCENT, fg="#ffffff",
+            activebackground=ACCENT, activeforeground="#ffffff"
+        )
+        self.btn_month.pack(side=tk.LEFT, padx=(0, 1))
+
+        self.btn_week = tk.Button(
+            toggle_frame, text="Woche", command=lambda: self._set_view("week"),
+            font=FONT_SMALL, width=6, relief=tk.FLAT, cursor="hand2",
+            bg=CELL_BG, fg=TEXT_MUTED,
+            activebackground=ENTRY_BG, activeforeground=TEXT
+        )
+        self.btn_week.pack(side=tk.LEFT)
 
         self.header_label = tk.Label(
             frame, text="", font=FONT_HEADER, bg=BG, fg="#ffffff"
@@ -107,7 +131,7 @@ class App:
         ).pack(side=tk.RIGHT)
 
         tk.Button(
-            frame, text="\u203a", command=self._next_month, width=3,
+            frame, text="\u203a", command=self._next, width=3,
             font=FONT_BOLD, bg=CELL_BG, fg=ACCENT,
             activebackground=ENTRY_BG, activeforeground=ACCENT,
             relief=tk.FLAT, cursor="hand2"
@@ -134,21 +158,61 @@ class App:
             relief=tk.FLAT, padx=12, pady=4, cursor="hand2"
         ).pack(side=tk.RIGHT)
 
-    def _prev_month(self):
-        if self.month == 1:
-            self.month = 12
-            self.year -= 1
+    def _prev(self):
+        if self.view_mode == "month":
+            if self.month == 1:
+                self.month = 12
+                self.year -= 1
+            else:
+                self.month -= 1
         else:
-            self.month -= 1
+            dates = get_week_dates(self.iso_year, self.current_week)
+            prev_monday = dates[0] - datetime.timedelta(days=7)
+            iso = prev_monday.isocalendar()
+            self.iso_year = iso[0]
+            self.current_week = iso[1]
         self._refresh()
 
-    def _next_month(self):
-        if self.month == 12:
-            self.month = 1
-            self.year += 1
+    def _next(self):
+        if self.view_mode == "month":
+            if self.month == 12:
+                self.month = 1
+                self.year += 1
+            else:
+                self.month += 1
         else:
-            self.month += 1
+            dates = get_week_dates(self.iso_year, self.current_week)
+            next_monday = dates[0] + datetime.timedelta(days=7)
+            iso = next_monday.isocalendar()
+            self.iso_year = iso[0]
+            self.current_week = iso[1]
         self._refresh()
+
+    def _set_view(self, mode):
+        if mode == self.view_mode:
+            return
+        if mode == "week":
+            # Jump to first KW of current month
+            first_day = datetime.date(self.year, self.month, 1)
+            iso = first_day.isocalendar()
+            self.iso_year = iso[0]
+            self.current_week = iso[1]
+        else:
+            # Jump to month containing Monday of current week
+            monday = datetime.date.fromisocalendar(self.iso_year, self.current_week, 1)
+            self.year = monday.year
+            self.month = monday.month
+        self.view_mode = mode
+        self._update_toggle_style()
+        self._refresh()
+
+    def _update_toggle_style(self):
+        if self.view_mode == "month":
+            self.btn_month.config(bg=ACCENT, fg="#ffffff", activebackground=ACCENT, activeforeground="#ffffff")
+            self.btn_week.config(bg=CELL_BG, fg=TEXT_MUTED, activebackground=ENTRY_BG, activeforeground=TEXT)
+        else:
+            self.btn_week.config(bg=ACCENT, fg="#ffffff", activebackground=ACCENT, activeforeground="#ffffff")
+            self.btn_month.config(bg=CELL_BG, fg=TEXT_MUTED, activebackground=ENTRY_BG, activeforeground=TEXT)
 
     def _apply_combobox_style(self, dialog):
         style = ttk.Style(dialog)
