@@ -39,9 +39,9 @@ View-State in der bestehenden `App`-Klasse (`src/ui.py`). Ein `self.view_mode`-F
 
 ### 4. State-Management
 
-- **Neuer State:** `self.view_mode` ("month" / "week"), `self.current_week` (ISO-KW-Nummer)
+- **Neuer State:** `self.view_mode` ("month" / "week"), `self.current_week` (ISO-KW-Nummer), `self.iso_year` (ISO-Jahreszahl für KW -- kann vom Kalender-Jahr abweichen, z.B. KW 1/2026 beginnt am 29.12.2025)
 - **App-Start:** Monatsansicht (wie bisher)
-- **Monat → Woche:** Springt zur ersten KW des aktuell angezeigten Monats
+- **Monat → Woche:** Springt zur ersten KW des aktuell angezeigten Monats (Hinweis: die angezeigte Woche kann Tage aus dem Vor-/Nachmonat enthalten -- das ist korrektes ISO-Verhalten)
 - **Woche → Monat:** Springt zum Monat, der den Montag der aktuellen KW enthält
 
 ### 5. Betroffene Methoden in `src/ui.py`
@@ -53,12 +53,23 @@ View-State in der bestehenden `App`-Klasse (`src/ui.py`). Ein `self.view_mode`-F
 | `_refresh()` | Dispatch auf `_refresh_month()` / `_refresh_week()` basierend auf `view_mode` |
 | `_refresh_month()` | Bestehende Monats-Grid-Logik (aus `_refresh()` extrahiert) |
 | `_refresh_week()` | Neue Methode: Wochen-Grid mit 7 Zellen bauen |
-| `_prev_month()` / `_next_month()` | In Wochen-Modus: KW-Navigation statt Monats-Navigation |
+| `_prev()` / `_next()` | Neue generische Navigation: navigiert monats- oder wochenweise je nach `view_mode`. Ersetzt `_prev_month()` / `_next_month()` |
 | Footer-Update in `_refresh()` | Stunden basierend auf `view_mode` berechnen |
 
-### 6. KW-Berechnung
+### 6. Fenstergeometrie
+
+- **Wochen-Modus:** Fenster wird vertikal kleiner (nur 1 Datenzeile statt 4-6). Die Zellen füllen den verfügbaren Platz.
+- **Monats-Modus:** Fenstergröße wie bisher.
+- Beim Moduswechsel wird die Fenstergröße über `root.geometry()` angepasst. `resizable(False, False)` bleibt bestehen.
+
+### 7. KW-Berechnung
 
 - Python `datetime.date.isocalendar()` liefert ISO-KW
 - Montag der KW: `datetime.date.fromisocalendar(year, week, 1)`
 - Sonntag: Montag + 6 Tage
 - Alle 7 Tage der Woche iterieren, Einträge aus Storage laden
+- KW 53 existiert in manchen Jahren (z.B. 2020, 2015) -- `fromisocalendar()` handhabt das korrekt
+
+### 8. Footer: Stundenlohn-Anzeige
+
+- Falls ein Stundenlohn konfiguriert ist, wird die Brutto-Berechnung im Wochen-Modus auf die Wochenstunden bezogen (analog zur bestehenden Monatsanzeige)
