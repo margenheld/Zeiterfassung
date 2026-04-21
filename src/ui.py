@@ -5,6 +5,7 @@ import calendar
 import ctypes
 import datetime
 import os
+import platform
 import sys
 import threading
 import traceback
@@ -73,7 +74,7 @@ class App:
         # Set window/taskbar icon
         ico_path = os.path.join(base_path, "assets", "margenheld-icon.ico")
         png_path = os.path.join(base_path, "assets", "margenheld-icon.png")
-        if os.path.exists(ico_path):
+        if platform.system() == "Windows" and os.path.exists(ico_path):
             self.root.iconbitmap(ico_path)
         if os.path.exists(png_path):
             icon = tk.PhotoImage(file=png_path)
