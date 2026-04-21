@@ -1,9 +1,62 @@
 # tests/test_mail.py
-import os
-import pytest
-from unittest.mock import patch, MagicMock
+import sys
+import types
 
-from src.mail import (
+# Die CI installiert google-auth nicht (s. CLAUDE.md). Damit die Tests
+# trotzdem laufen, stubben wir die Google-Module bei Bedarf.
+try:
+    import google.oauth2.credentials  # noqa: F401
+    import google.auth.exceptions  # noqa: F401
+    import google.auth.transport.requests  # noqa: F401
+except ImportError:
+    _google = types.ModuleType("google")
+    _google.__path__ = []
+    _oauth2 = types.ModuleType("google.oauth2")
+    _oauth2.__path__ = []
+    _creds = types.ModuleType("google.oauth2.credentials")
+
+    class _StubCreds:
+        @staticmethod
+        def from_authorized_user_file(path, scopes):
+            raise NotImplementedError
+
+    _creds.Credentials = _StubCreds
+
+    _auth = types.ModuleType("google.auth")
+    _auth.__path__ = []
+    _excs = types.ModuleType("google.auth.exceptions")
+
+    class RefreshError(Exception):
+        pass
+
+    class TransportError(Exception):
+        pass
+
+    _excs.RefreshError = RefreshError
+    _excs.TransportError = TransportError
+
+    _transport = types.ModuleType("google.auth.transport")
+    _transport.__path__ = []
+    _trq = types.ModuleType("google.auth.transport.requests")
+
+    class Request:  # noqa: D401
+        pass
+
+    _trq.Request = Request
+
+    sys.modules["google"] = _google
+    sys.modules["google.oauth2"] = _oauth2
+    sys.modules["google.oauth2.credentials"] = _creds
+    sys.modules["google.auth"] = _auth
+    sys.modules["google.auth.exceptions"] = _excs
+    sys.modules["google.auth.transport"] = _transport
+    sys.modules["google.auth.transport.requests"] = _trq
+
+import os  # noqa: E402
+import pytest  # noqa: E402
+from unittest.mock import patch, MagicMock  # noqa: E402
+
+from src.mail import (  # noqa: E402
     refresh_token_if_needed,
     TokenAuthError,
     TokenNetworkError,
