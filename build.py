@@ -118,14 +118,15 @@ def build_linux():
         f.write('#!/bin/sh\nHERE="$(dirname "$(readlink -f "${0}")")"\nexec "$HERE/usr/bin/Zeiterfassung" "$@"\n')
     os.chmod(apprun, 0o755)
 
-    appimage_name = f"Zeiterfassung-{VERSION}-x86_64.AppImage"
+    arch = platform.machine()
+    appimage_name = f"Zeiterfassung-{VERSION}-{arch}.AppImage"
     appimage_path = os.path.join("dist", appimage_name)
     if os.path.exists(appimage_path):
         os.remove(appimage_path)
 
     print(f"Building AppImage: {appimage_name} ...")
     env = os.environ.copy()
-    env["ARCH"] = "x86_64"
+    env["ARCH"] = arch
     subprocess.run(["appimagetool", appdir, appimage_path], check=True, env=env)
     print(f"AppImage created: {appimage_path}")
 
