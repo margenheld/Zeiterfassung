@@ -68,7 +68,7 @@ jobs:
 
       - name: Build exe
         run: |
-          pyinstaller --onefile --noconsole --name Zeiterfassung --icon assets/margenheld-icon.ico --add-data "assets;assets" src/main.py
+          pyinstaller --onefile --noconsole --name Zeiterfassung --icon assets/margenheld-icon.ico --add-data "assets;assets" --collect-all xhtml2pdf --collect-all reportlab src/main.py
 
       - name: Install Inno Setup
         shell: powershell
