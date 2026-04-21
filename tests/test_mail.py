@@ -44,6 +44,14 @@ except ImportError:
 
     _trq.Request = Request
 
+    # Parent-Attribute setzen, damit unittest.mock.patch via getattr navigieren kann
+    _google.oauth2 = _oauth2
+    _google.auth = _auth
+    _oauth2.credentials = _creds
+    _auth.exceptions = _excs
+    _auth.transport = _transport
+    _transport.requests = _trq
+
     sys.modules["google"] = _google
     sys.modules["google.oauth2"] = _oauth2
     sys.modules["google.oauth2.credentials"] = _creds
