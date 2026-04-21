@@ -133,3 +133,45 @@ class TestMacOSAutostart:
         assert len(calls) == 2
         assert calls[0][0][0][:2] == ["launchctl", "unload"]
         assert calls[1][0][0][:3] == ["launchctl", "load", "-w"]
+
+
+class TestLinuxAutostart:
+    @pytest.fixture
+    def fake_home(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        monkeypatch.delenv("HOMEDRIVE", raising=False)
+        monkeypatch.delenv("HOMEPATH", raising=False)
+        monkeypatch.setattr("src.autostart.platform.system", lambda: "Linux")
+        return tmp_path
+
+    def test_desktop_path(self, fake_home):
+        expected = os.path.join(
+            str(fake_home), ".config", "autostart", "Zeiterfassung.desktop"
+        )
+        assert _linux_desktop_path() == expected
+
+    def test_enable_writes_desktop_file(self, fake_home):
+        enable_autostart("/opt/Zeiterfassung.AppImage", "--minimized")
+        path = _linux_desktop_path()
+        assert os.path.exists(path)
+        content = open(path, encoding="utf-8").read()
+        assert "Exec=/opt/Zeiterfassung.AppImage --minimized" in content
+        assert "Type=Application" in content
+        assert "Name=Zeiterfassung" in content
+
+    def test_enable_without_arguments_has_no_trailing_space(self, fake_home):
+        enable_autostart("/opt/Zeiterfassung.AppImage", "")
+        content = open(_linux_desktop_path(), encoding="utf-8").read()
+        assert "Exec=/opt/Zeiterfassung.AppImage\n" in content
+
+    def test_disable_removes_desktop_file(self, fake_home):
+        path = _linux_desktop_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write("fake")
+        disable_autostart()
+        assert not os.path.exists(path)
+
+    def test_disable_tolerates_missing_file(self, fake_home):
+        disable_autostart()
