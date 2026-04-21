@@ -6,6 +6,7 @@ import ctypes
 import datetime
 import os
 import sys
+import traceback
 from src.storage import Storage
 from src.time_utils import calculate_hours, validate_entry, get_week_dates, get_week_label, week_spans_months
 from src.report import generate_report, generate_pdf
@@ -247,7 +248,7 @@ class App:
 
         # Email
         tk.Label(
-            dialog, text="E-Mail:", font=FONT, bg=BG, fg=TEXT
+            dialog, text="Absender:", font=FONT, bg=BG, fg=TEXT
         ).grid(row=0, column=0, padx=10, pady=8, sticky="w")
 
         email_var = tk.StringVar(value=self.settings.get("email"))
@@ -918,10 +919,10 @@ class App:
                 )
                 return
 
-            pdf_bytes = generate_pdf(date_from, date_to, entries, name=self.settings.get("name"))
             label = f"{date_from.strftime('%d.%m.%Y')} – {date_to.strftime('%d.%m.%Y')}"
 
             try:
+                pdf_bytes = generate_pdf(date_from, date_to, entries, name=self.settings.get("name"))
                 service = get_gmail_service(credentials_path, token_path)
                 subject_template = self.settings.get("mail_subject")
                 subject = subject_template.replace("{zeitraum}", label).replace("{gesamt}", f"{total}h")
@@ -939,7 +940,7 @@ class App:
             except Exception as e:
                 messagebox.showerror(
                     "Senden fehlgeschlagen",
-                    f"Fehler beim Senden:\n{e}",
+                    f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}",
                     parent=dialog
                 )
 

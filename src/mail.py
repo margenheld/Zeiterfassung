@@ -4,6 +4,7 @@ import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
+from email.header import Header
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
@@ -53,8 +54,8 @@ def send_email(service, to, subject, html_body, pdf_bytes=None, pdf_filename=Non
     if pdf_bytes:
         message = MIMEMultipart()
         message["to"] = to
-        message["subject"] = subject
-        message.attach(MIMEText(html_body, "html"))
+        message["subject"] = Header(subject, "utf-8")
+        message.attach(MIMEText(html_body, "html", _charset="utf-8"))
 
         attachment = MIMEApplication(pdf_bytes, _subtype="pdf")
         attachment.add_header(
@@ -63,9 +64,9 @@ def send_email(service, to, subject, html_body, pdf_bytes=None, pdf_filename=Non
         )
         message.attach(attachment)
     else:
-        message = MIMEText(html_body, "html")
+        message = MIMEText(html_body, "html", _charset="utf-8")
         message["to"] = to
-        message["subject"] = subject
+        message["subject"] = Header(subject, "utf-8")
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     body = {"raw": raw}

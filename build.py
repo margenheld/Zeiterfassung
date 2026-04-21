@@ -20,6 +20,8 @@ def build_exe():
         "--name", "Zeiterfassung",
         "--icon", "assets/margenheld-icon.ico",
         "--add-data", "assets;assets",
+        "--collect-all", "xhtml2pdf",
+        "--collect-all", "reportlab",
         "src/main.py",
     ]
     subprocess.run(cmd, check=True)
