@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.6.0
+- Installer für macOS (DMG, Apple Silicon und Intel) und Linux (AppImage) zusätzlich zum bestehenden Windows-Installer
+- Autostart jetzt auch unter macOS (LaunchAgent) und Linux (`.desktop`-Datei unter `~/.config/autostart/`)
+- Datenverzeichnisse plattformkonform: macOS unter `~/Library/Application Support/Zeiterfassung`, Linux unter `$XDG_DATA_HOME/Zeiterfassung`, Windows unverändert
+- Release-Workflow baut alle vier Artefakte parallel und taggt erst nach erfolgreichem Build aller Plattformen
+
 ## v1.5.0
 - Gmail-Token wird beim App-Start proaktiv im Hintergrund erneuert, damit beim Senden kein Login-Browser mehr aufpoppt
 - Differenzierte Fehlerbehandlung beim Token-Refresh: abgelaufene Anmeldung wird als Messagebox angezeigt, Netzwerkfehler beim Start werden still übergangen
