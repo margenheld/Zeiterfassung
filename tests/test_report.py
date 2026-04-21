@@ -112,3 +112,47 @@ def test_placeholders_replaced():
         content="Gesamt: {gesamt}"
     )
     assert "Gesamt: 8.0h" in html
+
+
+def test_week_header_and_sum_present():
+    entries = {
+        "2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0},
+    }
+    html, total = generate_report(datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries)
+    assert "KW 13" in html
+    assert "Summe KW 13" in html
+    assert "8.0h" in html
+
+
+def test_multiple_weeks_each_have_header_and_sum():
+    entries = {
+        "2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0},
+        "2026-03-24": {"start": "09:00", "end": "17:00", "pause": 0},
+        "2026-03-30": {"start": "08:00", "end": "17:00", "pause": 60},
+    }
+    html, total = generate_report(datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries)
+    assert "KW 13" in html
+    assert "KW 14" in html
+    assert "Summe KW 13" in html
+    assert "Summe KW 14" in html
+    pos_kw13 = html.index("KW 13")
+    pos_kw14 = html.index("KW 14")
+    assert pos_kw13 < pos_kw14
+
+
+def test_week_sum_equals_sum_of_days():
+    entries = {
+        "2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0},
+        "2026-03-24": {"start": "09:00", "end": "17:00", "pause": 0},
+    }
+    html, total = generate_report(datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries)
+    assert "16.0h" in html
+    assert total == 16.0
+
+
+def test_iso_week_across_year_boundary():
+    entries = {
+        "2025-12-29": {"start": "08:00", "end": "16:00", "pause": 0},
+    }
+    html, total = generate_report(datetime.date(2025, 12, 1), datetime.date(2026, 1, 31), entries)
+    assert "KW 1" in html
