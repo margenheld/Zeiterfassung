@@ -121,3 +121,15 @@ class TestMacOSAutostart:
         with patch("src.autostart.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
             disable_autostart()
+
+    def test_enable_is_idempotent_runs_unload_before_load(self, fake_home):
+        with patch("src.autostart.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            enable_autostart(
+                "/Applications/Zeiterfassung.app/Contents/MacOS/Zeiterfassung",
+                "--minimized",
+            )
+        calls = mock_run.call_args_list
+        assert len(calls) == 2
+        assert calls[0][0][0][:2] == ["launchctl", "unload"]
+        assert calls[1][0][0][:3] == ["launchctl", "load", "-w"]

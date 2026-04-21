@@ -48,6 +48,8 @@ def enable_autostart(target, arguments=""):
         _enable_macos(target, arguments)
     elif system == "Linux":
         _enable_linux(target, arguments)
+    else:
+        raise RuntimeError(f"Autostart not supported on {system}")
 
 
 def disable_autostart():
@@ -58,6 +60,8 @@ def disable_autostart():
         _disable_macos()
     elif system == "Linux":
         _disable_linux()
+    else:
+        raise RuntimeError(f"Autostart not supported on {system}")
 
 
 def _enable_windows(target, arguments):
@@ -105,20 +109,16 @@ def _enable_macos(target, arguments):
     with open(plist_path, "wb") as f:
         plistlib.dump(plist, f)
 
+    subprocess.run(["launchctl", "unload", plist_path], check=False)
     subprocess.run(["launchctl", "load", "-w", plist_path], check=True)
 
 
 def _disable_macos():
     plist_path = _macos_plist_path()
-    if os.path.exists(plist_path):
-        try:
-            subprocess.run(["launchctl", "unload", plist_path], check=False)
-        except FileNotFoundError:
-            pass
-        try:
-            os.remove(plist_path)
-        except FileNotFoundError:
-            pass
+    if not os.path.exists(plist_path):
+        return
+    subprocess.run(["launchctl", "unload", plist_path], check=False)
+    os.remove(plist_path)
 
 
 def _enable_linux(target, arguments):
