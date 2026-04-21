@@ -204,7 +204,7 @@ git commit -m "feat(mail): surface resolved credentials path in error message"
 
 - [ ] **Step 1: Add `import platform` at the top of `src/ui.py`**
 
-Add next to the other stdlib imports (after `import os`, around line 7):
+Add next to the other stdlib imports, directly after the existing `import os` line:
 
 ```python
 import platform
@@ -633,7 +633,7 @@ def resolve_autostart_target(base_path):
     return sys.executable, f"{main_py} --minimized"
 ```
 
-- [ ] **Step 2: Replace the inline logic in `save_settings` (lines 451–461) with a call to the helper**
+- [ ] **Step 2: Replace the inline logic in `save_settings` (lines 451–471 — the entire `if new_autostart != old_autostart:` block) with a call to the helper**
 
 ```python
             if new_autostart != old_autostart:
@@ -969,14 +969,12 @@ jobs:
         run: |
           $url = "https://jrsoftware.org/download.php/is.exe"
           Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\innosetup.exe"
-          Start-Process -FilePath "$env:TEMP\innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=C:\InnoSetup" -Wait
+          $target = "$env:LOCALAPPDATA\Programs\Inno Setup 6"
+          Start-Process -FilePath "$env:TEMP\innosetup.exe" `
+            -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$target" `
+            -Wait
       - name: Build
-        shell: cmd
-        run: |
-          python build.py
-          if not exist dist\Zeiterfassung_Setup.exe (
-            "C:\InnoSetup\ISCC.exe" /DAppVer=${{ needs.pre-check.outputs.version }} installer.iss
-          )
+        run: python build.py
       - uses: actions/upload-artifact@v4
         with:
           name: windows
