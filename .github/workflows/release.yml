@@ -6,19 +6,17 @@ on:
     branches: [master]
 
 jobs:
-  release:
+  pre-check:
     if: >
       github.event.pull_request.merged == true &&
       (contains(github.event.pull_request.labels.*.name, 'release:major') ||
        contains(github.event.pull_request.labels.*.name, 'release:minor') ||
        contains(github.event.pull_request.labels.*.name, 'release:patch'))
-    runs-on: windows-latest
-    permissions:
-      contents: write
-
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -34,40 +32,132 @@ jobs:
       - name: Fail if tag already exists
         shell: bash
         run: |
+          git fetch --tags
           if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
             echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Bump src/version.py in your PR before merging."
             exit 1
           fi
 
+  build-windows:
+    needs: pre-check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
       - name: Install dependencies
         run: pip install -r requirements.txt pyinstaller
-
-      - name: Build exe
-        run: |
-          pyinstaller --onefile --noconsole --name Zeiterfassung --icon assets/margenheld-icon.ico --add-data "assets;assets" --collect-all xhtml2pdf --collect-all reportlab src/main.py
-
       - name: Install Inno Setup
         shell: powershell
         run: |
           $url = "https://jrsoftware.org/download.php/is.exe"
           Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\innosetup.exe"
-          Start-Process -FilePath "$env:TEMP\innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=C:\InnoSetup" -Wait
+          $target = "$env:LOCALAPPDATA\Programs\Inno Setup 6"
+          Start-Process -FilePath "$env:TEMP\innosetup.exe" `
+            -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$target" `
+            -Wait
+      - name: Build
+        run: python build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/Zeiterfassung_Setup.exe
 
-      - name: Build installer
-        shell: cmd
+  build-macos-arm:
+    needs: pre-check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+      - name: Install create-dmg
+        run: brew install create-dmg
+      - name: Build
+        run: python build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm
+          path: dist/Zeiterfassung-*-arm64.dmg
+
+  build-macos-x86:
+    needs: pre-check
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+      - name: Install create-dmg
+        run: brew install create-dmg
+      - name: Build
+        run: python build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-x86
+          path: dist/Zeiterfassung-*-x86_64.dmg
+
+  build-linux:
+    needs: pre-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install system dependencies
         run: |
-          C:\InnoSetup\ISCC.exe /DAppVer=${{ steps.version.outputs.version }} installer.iss
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+      - name: Install appimagetool
+        run: |
+          curl -L -o appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+          sudo mv appimagetool /usr/local/bin/
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt pyinstaller
+      - name: Build
+        run: python build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/Zeiterfassung-*-x86_64.AppImage
+
+  publish:
+    needs: [pre-check, build-windows, build-macos-arm, build-macos-x86, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List downloaded artefacts
+        run: ls -la dist/
 
       - name: Tag and publish release
         shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "v${{ steps.version.outputs.version }}"
-          git push origin "v${{ steps.version.outputs.version }}"
-          gh release create "v${{ steps.version.outputs.version }}" \
-            dist/Zeiterfassung_Setup.exe \
-            --title "Zeiterfassung v${{ steps.version.outputs.version }}" \
-            --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.pre-check.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+          gh release create "v${VERSION}" \
+            dist/Zeiterfassung_Setup.exe \
+            dist/Zeiterfassung-${VERSION}-arm64.dmg \
+            dist/Zeiterfassung-${VERSION}-x86_64.dmg \
+            dist/Zeiterfassung-${VERSION}-x86_64.AppImage \
+            --title "Zeiterfassung v${VERSION}" \
+            --generate-notes
