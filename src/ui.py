@@ -56,6 +56,23 @@ TIME_VALUES = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 5)]
 PAUSE_VALUES = [str(m) for m in range(0, 125, 5)]
 
 
+def resolve_autostart_target(base_path):
+    """Return (target, arguments) for the current runtime/platform.
+
+    Frozen Windows/macOS: the executable itself.
+    Frozen Linux: $APPIMAGE if set (persistent path), otherwise sys.executable.
+    Script mode: Python interpreter + main.py.
+    """
+    if getattr(sys, "frozen", False):
+        if platform.system() == "Linux":
+            target = os.environ.get("APPIMAGE") or sys.executable
+        else:
+            target = sys.executable
+        return target, "--minimized"
+    main_py = os.path.join(base_path, "src", "main.py")
+    return sys.executable, f"{main_py} --minimized"
+
+
 class App:
     def __init__(self, root, storage, settings, base_path="."):
         self.root = root
@@ -452,13 +469,7 @@ class App:
             if new_autostart != old_autostart:
                 try:
                     if new_autostart:
-                        if getattr(sys, "frozen", False):
-                            target = sys.executable
-                            arguments = "--minimized"
-                        else:
-                            target = sys.executable
-                            main_py = os.path.join(self.base_path, "src", "main.py")
-                            arguments = f"{main_py} --minimized"
+                        target, arguments = resolve_autostart_target(self.base_path)
                         enable_autostart(target, arguments)
                     else:
                         disable_autostart()
@@ -467,7 +478,7 @@ class App:
                     messagebox.showerror(
                         "Autostart-Fehler",
                         f"Autostart konnte nicht geändert werden:\n{e}",
-                        parent=dialog
+                        parent=dialog,
                     )
                     return
 
