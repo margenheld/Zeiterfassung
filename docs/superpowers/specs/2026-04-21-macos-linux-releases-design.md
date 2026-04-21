@@ -60,7 +60,7 @@ def get_base_path():
 
 ### Windows stays as is — explicit non-goal
 
-Existing Windows installs have `zeiterfassung.json`, `settings.json`, `token.json`, `credentials.json` **next to the executable** in `C:\Users\<user>\AppData\Local\Programs\Zeiterfassung\` (Inno Setup installs into `{userpf}` which is writable). Migrating them into `%LOCALAPPDATA%\Zeiterfassung` would require discovery + move logic + coordination with running instances. The cost-benefit does not justify the risk — Windows behaviour is frozen.
+Existing Windows installs have `zeiterfassung.json`, `settings.json`, `token.json`, `credentials.json` **next to the executable**. Inno Setup installs into `{autopf}` (see `installer.iss:6`), which expands depending on the elevation prompt to `{userpf}` (per-user, the default with `PrivilegesRequired=lowest`) or `{commonpf}` (all users, if the UAC dialog is accepted). Both variants are writable for the installing user. Migrating data into `%LOCALAPPDATA%\Zeiterfassung` would require discovery + move logic + coordination with running instances. The cost-benefit does not justify the risk — Windows behaviour is frozen.
 
 ### `credentials.json` placement on macOS/Linux
 
@@ -76,7 +76,7 @@ Parametrised, all running on `ubuntu-latest` via `platform.system()` mocking:
 - `test_paths_frozen_macos_returns_library_support_and_creates_dir`
 - `test_paths_frozen_linux_respects_xdg_data_home`
 - `test_paths_frozen_linux_falls_back_to_local_share`
-- `test_paths_repo_mode_unchanged`
+- `test_paths_repo_mode_unchanged` — parametrised over `platform.system() ∈ {Windows, Darwin, Linux}` so dev-mode on a Mac laptop is covered explicitly.
 
 ---
 
@@ -88,9 +88,11 @@ Parametrised, all running on `ubuntu-latest` via `platform.system()` mocking:
 
 ### `src/ui.py:74-81` — guard `iconbitmap`
 
-`root.iconbitmap("*.ico")` raises `TclError` on macOS. Fix:
+`root.iconbitmap("*.ico")` raises `TclError` on macOS. Fix — `ico_path` and `png_path` come from the existing two lines above (derived from `base_path + "assets/margenheld-icon.{ico,png}"`, unchanged):
 
 ```python
+ico_path = os.path.join(base_path, "assets", "margenheld-icon.ico")
+png_path = os.path.join(base_path, "assets", "margenheld-icon.png")
 if platform.system() == "Windows" and os.path.exists(ico_path):
     self.root.iconbitmap(ico_path)
 if os.path.exists(png_path):
@@ -121,7 +123,7 @@ None — `ui.py` has no existing unit-test harness; adding one is out of scope. 
 
 ### Public API unchanged
 
-`enable_autostart(target, arguments="")` and `disable_autostart()` keep their signatures so `ui.py::save_settings` does not change.
+`enable_autostart(target, arguments="")` and `disable_autostart()` keep their signatures — the module's contract is stable. `ui.py::save_settings` (`ui.py:442-463`) still needs a small extension: it must compute the correct `target` per platform (see "What is `target` on each platform" below). The call site is unchanged, but the platform-dependent `target` resolution is new logic inside `save_settings`.
 
 ### Dispatcher structure
 
@@ -154,9 +156,11 @@ RunAtLoad:        true
 ProcessType:      Interactive
 ```
 
-Then `subprocess.run(["launchctl", "load", plist_path], check=True)`.
+Then `subprocess.run(["launchctl", "load", "-w", plist_path], check=True)`. `-w` persists the load across logins.
 
-`_disable_macos`: `launchctl unload`, then `os.remove`. Both steps tolerate "already absent" state.
+Note: `launchctl load` is technically deprecated in favour of `launchctl bootstrap gui/<uid> <plist>` on macOS 10.10+, but `load` still works reliably and avoids fiddling with the current console user's UID. We stay on `load -w` for simplicity; the modern form is a future hardening option if we ever hit issues.
+
+`_disable_macos`: `launchctl unload <plist>`, then `os.remove`. Both steps tolerate "already absent" state (wrap each in a try/except that swallows `FileNotFoundError` / non-zero exit).
 
 ### Linux: `.desktop` file
 
@@ -183,10 +187,10 @@ Determined in `src/ui.py::save_settings` and passed to `enable_autostart()`:
 |----------|------|----------|
 | Windows | frozen | `sys.executable` |
 | macOS | frozen (`.app`) | `sys.executable` (= `…/Zeiterfassung.app/Contents/MacOS/Zeiterfassung`) |
-| Linux | frozen (AppImage) | **`os.environ["APPIMAGE"]`** — `sys.executable` points into the extracted runtime and would be invalid after the AppImage is closed |
+| Linux | frozen (AppImage) | **`os.environ.get("APPIMAGE") or sys.executable`** — `sys.executable` points into the extracted `/tmp/_MEIxxx` runtime and is invalidated when the AppImage exits; `$APPIMAGE` is the persistent path set by the AppImage runtime. The `or`-fallback covers the case of a developer running the PyInstaller binary directly (without AppImage wrap) — autostart then points at the raw binary, which is still usable locally. |
 | any | repo (script) | `sys.executable` (= Python), with `arguments=f"{main_py} --minimized"` |
 
-The AppImage special case lives in `ui.py`, not `autostart.py`, keeping the autostart module platform-logic-only.
+The AppImage special case lives in `ui.py`, not `autostart.py`, keeping the autostart module platform-logic-only. A unit test covers the `APPIMAGE`-unset fallback explicitly.
 
 ### Tests (`tests/test_autostart.py`)
 
@@ -197,7 +201,13 @@ Extended from 4 to ~10 tests, parametrised via `platform.system()` mocking and `
 - `test_disable_macos_removes_plist_and_unloads`
 - `test_enable_linux_writes_desktop_file_with_correct_exec_line`
 - `test_disable_linux_removes_desktop_file`
-- Existing Windows tests unchanged.
+
+Plus in `tests/test_ui.py` (new small file) or `tests/test_autostart.py`:
+
+- `test_save_settings_computes_appimage_target_when_set` (monkeypatch `APPIMAGE=/path/foo.AppImage`, verify `enable_autostart` is called with that as `target`)
+- `test_save_settings_falls_back_to_sys_executable_when_appimage_unset`
+
+Existing Windows tests unchanged.
 
 ---
 
@@ -280,7 +290,7 @@ Local build dep: `appimagetool` binary on `PATH` (single AppImage download).
 
 ### Cross-platform details
 
-- `--add-data` separator uses `os.pathsep` (`;` on Windows, `:` elsewhere) — not hardcoded.
+- `--add-data` separator follows PyInstaller's convention (`;` on Windows, `:` elsewhere). This happens to match `os.pathsep` on all three target platforms, so `"assets" + os.pathsep + "assets"` is the pragmatic way to assemble the argument.
 - `--collect-all xhtml2pdf --collect-all reportlab` is mandatory on every platform (per CLAUDE.md — without it, PDF generation silently fails in frozen mode).
 - No `.spec` file is committed. CLI arguments remain the source of truth; `*.spec` is already gitignored.
 
@@ -353,6 +363,13 @@ Platform-specific pack tool setup:
 
 **Atomic semantics:** The tag is only pushed after all four build jobs have succeeded. A failed macOS-Intel build aborts the entire publish step; no half-complete release gets created. This is a behavioural change from today's single-job workflow but desired.
 
+**Partial failure recovery:** If `publish` fails *after* the tag has been pushed (e.g. `gh release create` network hiccup), a simple re-run of the workflow is blocked by `pre-check`'s "tag already exists" guard. Recovery procedure (documented in `CLAUDE.md` under release notes):
+
+1. Delete the orphan tag locally and on the remote: `git tag -d v<ver>` + `git push origin :refs/tags/v<ver>`.
+2. Re-run the workflow from the PR's Actions view, or alternatively bump `src/version.py` to the next patch and re-merge.
+
+Tag-delete is a rare manual step for a rare failure mode; automating it would require admin-bypass permissions in the workflow, which we avoid.
+
 ### `on:` trigger unchanged
 
 `pull_request: types: [closed], branches: [master]`, filter `merged == true && contains(labels, 'release:*')`.
@@ -374,7 +391,7 @@ The repository is public. GitHub Actions minutes on public repositories are unli
 - Platform badge: `Windows | macOS | Linux` (currently `Windows | Linux`).
 - Platform compatibility table: add macOS column, mark features implemented (calendar, PDF, mail, autostart, window icon).
 - Installation section: add macOS (DMG drag-to-Applications) and Linux (AppImage `chmod +x`) instructions.
-- First-launch Gatekeeper hint for macOS (right-click → Open, or `xattr -d com.apple.quarantine`).
+- First-launch Gatekeeper hint for macOS: right-click → Open, or `xattr -dr com.apple.quarantine /Applications/Zeiterfassung.app` (recursive, on the bundle path).
 - `credentials.json` placement paths per platform.
 
 `CLAUDE.md` updates: keep Windows-centric build notes, add short section pointing `build.py` is platform-aware and lists the per-platform local build tool prereqs.
