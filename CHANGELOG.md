@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.0
+- Gmail-Token wird beim App-Start proaktiv im Hintergrund erneuert, damit beim Senden kein Login-Browser mehr aufpoppt
+- Differenzierte Fehlerbehandlung beim Token-Refresh: abgelaufene Anmeldung wird als Messagebox angezeigt, Netzwerkfehler beim Start werden still übergangen
+
 ## v1.4.0
 - Wochen-Gruppierung im E-Mail- und PDF-Bericht mit Wochenüberschrift und Wochensumme je KW
 - UTF-8-Fix: Umlaute und ß im E-Mail-Body und Betreff werden korrekt dargestellt

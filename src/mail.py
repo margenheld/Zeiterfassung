@@ -9,6 +9,61 @@ from email.header import Header
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
 
+class TokenAuthError(Exception):
+    """Refresh-Token ist ungültig — User muss sich neu anmelden."""
+
+
+class TokenNetworkError(Exception):
+    """Refresh fehlgeschlagen wegen Netzwerkproblem."""
+
+
+def _refresh_and_persist(creds, token_path):
+    """Refresh credentials and write them back. Translates Google exceptions."""
+    from google.auth.exceptions import RefreshError, TransportError
+    from google.auth.transport.requests import Request
+
+    try:
+        creds.refresh(Request())
+    except RefreshError as e:
+        raise TokenAuthError(str(e)) from e
+    except TransportError as e:
+        raise TokenNetworkError(str(e)) from e
+
+    with open(token_path, "w") as f:
+        f.write(creds.to_json())
+
+
+def refresh_token_if_needed(token_path="token.json"):
+    """Proactively refresh the Gmail token when it is expired.
+
+    Returns one of:
+        "no_token"  — no token file present (first use)
+        "valid"     — token is still valid, no refresh needed
+        "refreshed" — refresh succeeded and file was updated
+
+    Raises:
+        TokenAuthError    — refresh_token is invalid, user must re-authenticate
+        TokenNetworkError — network issue prevented the refresh attempt
+    """
+    from google.oauth2.credentials import Credentials
+
+    if not os.path.exists(token_path):
+        return "no_token"
+
+    creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+
+    if creds.valid:
+        return "valid"
+
+    if not creds.expired or not creds.refresh_token:
+        raise TokenAuthError(
+            "Token ist ungültig und enthält kein Refresh-Token."
+        )
+
+    _refresh_and_persist(creds, token_path)
+    return "refreshed"
+
+
 def get_gmail_service(credentials_path="credentials.json", token_path="token.json"):
     """Authenticate with Gmail API and return a service object.
 
@@ -16,7 +71,6 @@ def get_gmail_service(credentials_path="credentials.json", token_path="token.jso
     """
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
-    from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
 
     creds = None
@@ -26,8 +80,8 @@ def get_gmail_service(credentials_path="credentials.json", token_path="token.jso
 
     if creds and creds.expired and creds.refresh_token:
         try:
-            creds.refresh(Request())
-        except Exception:
+            _refresh_and_persist(creds, token_path)
+        except TokenAuthError:
             creds = None
 
     if not creds or not creds.valid:
@@ -39,9 +93,8 @@ def get_gmail_service(credentials_path="credentials.json", token_path="token.jso
             )
         flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
         creds = flow.run_local_server(port=0)
-
-    with open(token_path, "w") as f:
-        f.write(creds.to_json())
+        with open(token_path, "w") as f:
+            f.write(creds.to_json())
 
     return build("gmail", "v1", credentials=creds)
 

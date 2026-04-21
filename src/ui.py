@@ -6,11 +6,18 @@ import ctypes
 import datetime
 import os
 import sys
+import threading
 import traceback
 from src.storage import Storage
 from src.time_utils import calculate_hours, validate_entry, get_week_dates, get_week_label, week_spans_months
 from src.report import generate_report, generate_pdf
-from src.mail import get_gmail_service, send_email
+from src.mail import (
+    get_gmail_service,
+    send_email,
+    refresh_token_if_needed,
+    TokenAuthError,
+    TokenNetworkError,
+)
 from src.autostart import enable_autostart, disable_autostart
 from src.version import VERSION
 
@@ -87,6 +94,36 @@ class App:
         self._build_grid()
         self._build_footer()
         self._refresh()
+        self._proactive_token_refresh()
+
+    def _proactive_token_refresh(self):
+        """Erneuert den Gmail-Token beim App-Start im Hintergrund.
+
+        Auth-Fehler werden als Messagebox gezeigt, Netzwerkfehler still
+        übergangen, damit ein Offline-Start nicht stört.
+        """
+        token_path = os.path.join(self.base_path, "token.json")
+
+        def worker():
+            try:
+                refresh_token_if_needed(token_path)
+            except TokenAuthError as e:
+                msg = str(e)
+                self.root.after(0, lambda: messagebox.showwarning(
+                    "Gmail-Anmeldung abgelaufen",
+                    "Der Gmail-Token konnte nicht automatisch erneuert werden:\n\n"
+                    f"{msg}\n\n"
+                    "Beim nächsten Senden wirst du zur erneuten Anmeldung aufgefordert."
+                ))
+            except TokenNetworkError:
+                pass
+            except Exception as e:
+                err = f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+                self.root.after(0, lambda: messagebox.showerror(
+                    "Token-Refresh fehlgeschlagen", err
+                ))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _build_header(self):
         frame = tk.Frame(self.root, bg=BG)
