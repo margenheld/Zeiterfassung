@@ -1,6 +1,6 @@
 # Zeiterfassung – Projekthinweise
 
-Kleines Windows-Tool zur Zeiterfassung (Tkinter + Python), das PDF-Berichte erzeugt und per Gmail verschickt.
+Kleines Desktop-Tool zur Zeiterfassung (Tkinter + Python) für Windows, macOS und Linux, das PDF-Berichte erzeugt und per Gmail verschickt.
 
 ## Release-Prozess
 
@@ -14,6 +14,19 @@ Ablauf vor dem Merge:
 
 Der Workflow pusht **nichts** nach `master`. Versionsbump gehört in den PR.
 
+## Recovery bei teilweise fehlgeschlagenem Release
+
+Wenn der `publish`-Job nach dem Tag-Push fehlschlägt (z.B. `gh release create` Netzwerkproblem), blockiert der Pre-Check beim Re-Run die erneute Ausführung wegen "tag already exists". Ablauf:
+
+1. Tag lokal und remote löschen:
+   ```
+   git tag -d v<ver>
+   git push origin :refs/tags/v<ver>
+   ```
+2. Workflow im PR unter Actions → „Re-run all jobs" erneut starten.
+
+Alternative: `src/version.py` auf die nächste Patch-Version bumpen und einen neuen Release-PR mergen.
+
 ## Branch Protection
 
 `master` ist protected: direkte Pushes erfordern Admin-Bypass. Im Normalfall über PR arbeiten. Für Notfall-Fixes am CI kann der Repo-Owner direkt pushen.
@@ -24,12 +37,31 @@ Der Workflow pusht **nichts** nach `master`. Versionsbump gehört in den PR.
 python build.py
 ```
 
-`build.py` ruft PyInstaller mit `--onefile --noconsole` auf und benötigt zwingend `--collect-all xhtml2pdf --collect-all reportlab`, sonst schlägt die PDF-Erzeugung im gebauten Exe stumm fehl.
+`build.py` ist ein Plattform-Dispatcher und ruft PyInstaller je nach `platform.system()` unterschiedlich auf. Auf allen drei Plattformen sind `--collect-all xhtml2pdf --collect-all reportlab` zwingend — ohne sie schlägt die PDF-Erzeugung im gebauten Artefakt stumm fehl.
+
+## Cross-Platform Builds
+
+`build.py` ist plattformabhängig:
+
+| Plattform | Voraussetzung | Ausgabe |
+|-----------|---------------|---------|
+| Windows | Inno Setup 6 unter `%LOCALAPPDATA%\Programs\Inno Setup 6\` | `dist/Zeiterfassung_Setup.exe` |
+| macOS | `brew install create-dmg` | `dist/Zeiterfassung-<ver>-<arch>.dmg` (arch = `arm64` oder `x86_64`) |
+| Linux | `apt install libfuse2` + `appimagetool` auf `$PATH` | `dist/Zeiterfassung-<ver>-<arch>.AppImage` |
+
+Fehlt das Pack-Tool lokal, überspringt `build.py` den Pack-Schritt mit Warnung — der PyInstaller-Build läuft trotzdem durch. Das ist für Local-Dev gewollt.
 
 ## Installation & Daten
 
-Installierte App liegt unter `C:\Users\marge\AppData\Local\Programs\Zeiterfassung\`.
-Benutzerdaten (Entries, Settings, `token.json`, `credentials.json`) liegen im selben Verzeichnis wie die Exe — `src/paths.py` unterscheidet zwischen Frozen-Modus (`os.path.dirname(sys.executable)`) und Repo-Modus.
+Installierte App und Benutzerdaten liegen je nach Plattform:
+
+| Plattform | Installation | Benutzerdaten (Entries, Settings, `token.json`, `credentials.json`) |
+|-----------|--------------|--------------------------------------------------------------------|
+| Windows | `%LOCALAPPDATA%\Programs\Zeiterfassung\` | Gleiches Verzeichnis wie die Exe |
+| macOS | `/Applications/Zeiterfassung.app` | `~/Library/Application Support/Zeiterfassung/` |
+| Linux | Beliebige AppImage-Datei | `$XDG_DATA_HOME/Zeiterfassung/` (Fallback `~/.local/share/Zeiterfassung/`) |
+
+`src/paths.py::get_base_path` dispatched über `platform.system()` und unterscheidet zwischen Frozen- und Repo-Modus.
 
 ## UI-Fehler sichtbar machen
 

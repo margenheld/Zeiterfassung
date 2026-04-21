@@ -87,9 +87,9 @@ def get_gmail_service(credentials_path="credentials.json", token_path="token.jso
     if not creds or not creds.valid:
         if not os.path.exists(credentials_path):
             raise FileNotFoundError(
-                "credentials.json nicht gefunden. "
+                f"credentials.json nicht gefunden unter:\n{credentials_path}\n\n"
                 "Bitte erstelle ein Google Cloud Projekt mit Gmail API "
-                "und lade die OAuth2 Client-ID herunter."
+                "und lade die OAuth2 Client-ID dort ab."
             )
         flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
         creds = flow.run_local_server(port=0)

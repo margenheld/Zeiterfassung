@@ -2,7 +2,7 @@
 
 Desktop-App zur Erfassung von Arbeitszeiten mit Kalenderansicht, PDF-Report und automatischem Gmail-Versand.
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)
+![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
 ## Features
 
@@ -11,7 +11,7 @@ Desktop-App zur Erfassung von Arbeitszeiten mit Kalenderansicht, PDF-Report und 
 - **E-Mail-Versand** — HTML-E-Mail mit PDF-Anhang über Gmail API (OAuth2)
 - **Zeitraumwahl** — Flexibler Datumsbereich für Reports
 - **Einstellungen** — E-Mail-Vorlagen mit Platzhaltern, Standardpause, Empfänger
-- **Autostart** — Optionaler minimierter Start bei Windows-Anmeldung
+- **Autostart** — Optionaler minimierter Start bei Anmeldung (Windows, macOS, Linux)
 - **Dark Mode UI** — Modernes dunkles Design
 - **Standalone .exe** — Per PyInstaller als einzelne Datei paketierbar
 
@@ -26,12 +26,12 @@ Zeiterfassung/
 │   ├── settings.py      # Einstellungen mit Standardwerten
 │   ├── report.py        # HTML- & PDF-Reportgenerierung
 │   ├── mail.py          # Gmail OAuth2-Authentifizierung & Versand
-│   ├── autostart.py     # Windows-Autostart via VBScript-Shortcut
+│   ├── autostart.py     # Plattformabhängiger Autostart (Windows/macOS/Linux)
 │   ├── time_utils.py    # Zeitberechnung und Validierung
 │   └── paths.py         # Pfadauflösung (Script- vs. Frozen-Modus)
 ├── tests/               # pytest-Testdateien
 ├── assets/
-│   └── margenheld-icon  # App-Icon (png + ico)
+│   └── margenheld-icon  # App-Icon (.png + .ico + .icns)
 ├── docs/
 │   └── gmail-setup.md   # Gmail-Einrichtungsanleitung
 ├── build.py             # PyInstaller-Buildskript
@@ -43,12 +43,40 @@ Zeiterfassung/
 
 ## Installation
 
-### Voraussetzungen
+### Fertige Releases
+
+Vorgefertigte Installer für alle drei Plattformen gibt es unter [Releases](../../releases):
+
+**Windows**
+Lade `Zeiterfassung_Setup.exe` und führe den Installer aus. App installiert nach `%LOCALAPPDATA%\Programs\Zeiterfassung\`.
+
+**macOS**
+Lade `Zeiterfassung-<ver>-arm64.dmg` (Apple Silicon) oder `Zeiterfassung-<ver>-x86_64.dmg` (Intel) herunter. Öffne das DMG und ziehe die App in den Applications-Ordner. Beim ersten Start: Rechtsklick auf die App → „Öffnen" (Gatekeeper-Warnung bestätigen), oder im Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Zeiterfassung.app
+```
+
+Der Build ist nicht signiert — dieser Schritt ist einmalig nötig.
+
+**Linux**
+Lade `Zeiterfassung-<ver>-x86_64.AppImage` herunter:
+
+```bash
+chmod +x Zeiterfassung-<ver>-x86_64.AppImage
+./Zeiterfassung-<ver>-x86_64.AppImage
+```
+
+Voraussetzung: `libfuse2` installiert (`sudo apt install libfuse2` unter Debian/Ubuntu).
+
+### Aus dem Source-Code
+
+#### Voraussetzungen
 
 - Python 3.10+
-- Windows 10/11 oder Linux (mit Tkinter)
+- Windows 10/11, macOS 12+ oder Linux (mit Tkinter)
 
-### Linux: Tkinter installieren
+#### Linux: Tkinter installieren
 
 Tkinter ist unter Linux nicht immer vorinstalliert:
 
@@ -63,7 +91,7 @@ sudo dnf install python3-tkinter
 sudo pacman -S tk
 ```
 
-### Setup
+#### Setup
 
 ```bash
 # Repository klonen
@@ -77,14 +105,14 @@ pip install -r requirements.txt
 python -m src.main
 ```
 
-### Abhängigkeiten
+#### Abhängigkeiten
 
 | Paket | Zweck |
 |-------|-------|
 | `google-auth-oauthlib` | OAuth2-Authentifizierung für Gmail |
 | `google-api-python-client` | Gmail API Client |
 | `xhtml2pdf` | PDF-Generierung aus HTML |
-| `pyinstaller` | Paketierung als Standalone-.exe |
+| `pyinstaller` | Paketierung als Standalone-Binary |
 
 ## Gmail API einrichten
 
@@ -117,7 +145,11 @@ Damit die App E-Mails versenden kann, muss einmalig ein Google Cloud Projekt mit
 1. **APIs & Dienste** → **Anmeldedaten**
 2. **Anmeldedaten erstellen** → **OAuth-Client-ID**
 3. Anwendungstyp: **Desktopanwendung** → Name: "Zeiterfassung" → **Erstellen**
-4. **JSON herunterladen** → als `credentials.json` im Projektordner speichern
+4. **JSON herunterladen** → als `credentials.json` speichern:
+   - **Entwicklung (aus dem Source):** im Projekt-Root
+   - **Windows (installiert):** `%LOCALAPPDATA%\Programs\Zeiterfassung\`
+   - **macOS (installiert):** `~/Library/Application Support/Zeiterfassung/`
+   - **Linux (AppImage):** `~/.local/share/Zeiterfassung/` (oder `$XDG_DATA_HOME/Zeiterfassung/`)
 
 ### 5. Erster Versand
 
@@ -147,7 +179,7 @@ Damit die App E-Mails versenden kann, muss einmalig ein Google Cloud Projekt mit
 | **Begrüßung** | Anrede im E-Mail-Text |
 | **Inhalt** | E-Mail-Body mit Platzhaltern |
 | **Grußformel** | Abschluss der E-Mail (Zeilenumbrüche mit `\n`) |
-| **Autostart** | App minimiert bei Windows-Anmeldung starten |
+| **Autostart** | App minimiert bei Systemanmeldung starten (Windows/macOS/Linux) |
 
 ### Platzhalter in E-Mail-Vorlagen
 
@@ -158,52 +190,33 @@ Damit die App E-Mails versenden kann, muss einmalig ein Google Cloud Projekt mit
 
 ## Build
 
-Als Standalone-.exe paketieren:
-
 ```bash
 python build.py
 ```
 
-Die fertige Datei liegt unter `dist/Zeiterfassung.exe`. Folgende Dateien müssen im selben Ordner wie die .exe liegen:
+`build.py` erkennt die Plattform via `platform.system()` und baut das passende Artefakt:
 
-- `credentials.json` — Gmail OAuth-Credentials
-- `assets/margenheld-icon.ico` — App-Icon
-- `assets/margenheld-icon.png` — App-Icon
+| Plattform | Voraussetzung | Ausgabe |
+|-----------|---------------|---------|
+| Windows | [Inno Setup 6](https://jrsoftware.org/isdl.php) unter `%LOCALAPPDATA%\Programs\Inno Setup 6\` | `dist/Zeiterfassung_Setup.exe` |
+| macOS | `brew install create-dmg` | `dist/Zeiterfassung-<ver>-<arch>.dmg` |
+| Linux | `apt install libfuse2` + `appimagetool` auf `$PATH` | `dist/Zeiterfassung-<ver>-<arch>.AppImage` |
 
-`settings.json`, `zeiterfassung.json` und `token.json` werden automatisch erstellt.
+Fehlt das Pack-Tool, überspringt `build.py` den Pack-Schritt mit Warnung — der PyInstaller-Build läuft trotzdem durch.
 
 ## Plattform-Kompatibilität
 
-Die App läuft auf **Windows und Linux**. Plattformspezifische Features werden automatisch erkannt:
+Die App läuft auf **Windows, macOS und Linux**. Plattformspezifische Features werden automatisch erkannt:
 
-| Feature | Windows | Linux |
-|---------|---------|-------|
-| Kalender & Zeiterfassung | ✓ | ✓ |
-| PDF-Report & E-Mail-Versand | ✓ | ✓ |
-| Einstellungen & Vorlagen | ✓ | ✓ |
-| Taskbar-Icon (AppUserModelID) | ✓ | — (nicht nötig) |
-| Window-Icon (.ico) | ✓ | ✓ (via .png Fallback) |
-| Autostart bei Anmeldung | ✓ (VBScript-Shortcut) | — (manuell via `.desktop`-Datei oder Systemd) |
-| Standalone .exe (PyInstaller) | ✓ | ✓ (als Binary ohne Endung) |
-
-### Technische Details
-
-- **`ctypes.windll`** (Windows-Taskbar-Icon): In `try/except` gekapselt — wird unter Linux ignoriert
-- **`iconbitmap(.ico)`**: Nur geladen wenn die .ico-Datei existiert; unter Linux wird stattdessen `iconphoto(.png)` genutzt
-- **Autostart**: `enable_autostart()` / `disable_autostart()` prüfen `platform.system()` und sind unter Linux ein No-Op — die Checkbox wird angezeigt, hat aber keine Wirkung
-
-### Autostart unter Linux (manuell)
-
-Eine `.desktop`-Datei unter `~/.config/autostart/` erstellen:
-
-```ini
-[Desktop Entry]
-Type=Application
-Name=Zeiterfassung
-Exec=python3 /pfad/zu/Zeiterfassung/src/main.py --minimized
-Hidden=false
-X-GNOME-Autostart-enabled=true
-```
+| Feature | Windows | macOS | Linux |
+|---------|---------|-------|-------|
+| Kalender & Zeiterfassung | ✓ | ✓ | ✓ |
+| PDF-Report & E-Mail-Versand | ✓ | ✓ | ✓ |
+| Einstellungen & Vorlagen | ✓ | ✓ | ✓ |
+| Taskbar-Icon (AppUserModelID) | ✓ | — (nicht nötig) | — (nicht nötig) |
+| Window-Icon | ✓ (`.ico`) | ✓ (`.png` Fallback) | ✓ (`.png` Fallback) |
+| Autostart bei Anmeldung | ✓ (VBScript-Shortcut) | ✓ (LaunchAgent plist) | ✓ (`.desktop`-Datei) |
+| Standalone-Binary (PyInstaller) | ✓ (`.exe`) | ✓ (`.app` Bundle) | ✓ (AppImage) |
 
 ## Tests
 
@@ -218,3 +231,12 @@ Alle Daten werden lokal als JSON gespeichert:
 - **zeiterfassung.json** — Zeiteinträge (Schlüssel: ISO-Datum `YYYY-MM-DD`)
 - **settings.json** — Benutzereinstellungen
 - **token.json** — Gmail OAuth-Token (wird automatisch erneuert)
+
+Speicherort je nach Plattform (siehe `src/paths.py`):
+
+| Plattform | Pfad |
+|-----------|------|
+| Windows (installiert) | `%LOCALAPPDATA%\Programs\Zeiterfassung\` |
+| macOS (installiert) | `~/Library/Application Support/Zeiterfassung/` |
+| Linux (AppImage) | `$XDG_DATA_HOME/Zeiterfassung/` (Fallback `~/.local/share/Zeiterfassung/`) |
+| Entwicklung (Source) | Projekt-Root |
