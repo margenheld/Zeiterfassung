@@ -50,13 +50,7 @@ jobs:
         run: pip install -r requirements.txt pyinstaller
       - name: Install Inno Setup
         shell: powershell
-        run: |
-          $url = "https://jrsoftware.org/download.php/is.exe"
-          Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\innosetup.exe"
-          $target = "$env:LOCALAPPDATA\Programs\Inno Setup 6"
-          Start-Process -FilePath "$env:TEMP\innosetup.exe" `
-            -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$target" `
-            -Wait
+        run: choco install innosetup -y --no-progress
       - name: Build
         run: python build.py
       - uses: actions/upload-artifact@v4
@@ -83,25 +77,6 @@ jobs:
           name: macos-arm
           path: dist/Zeiterfassung-*-arm64.dmg
 
-  build-macos-x86:
-    needs: pre-check
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Install dependencies
-        run: pip install -r requirements.txt pyinstaller
-      - name: Install create-dmg
-        run: brew install create-dmg
-      - name: Build
-        run: python build.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-x86
-          path: dist/Zeiterfassung-*-x86_64.dmg
-
   build-linux:
     needs: pre-check
     runs-on: ubuntu-latest
@@ -113,7 +88,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2
+          sudo apt-get install -y libfuse2 libcairo2-dev pkg-config
       - name: Install appimagetool
         run: |
           curl -L -o appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
@@ -129,7 +104,7 @@ jobs:
           path: dist/Zeiterfassung-*-x86_64.AppImage
 
   publish:
-    needs: [pre-check, build-windows, build-macos-arm, build-macos-x86, build-linux]
+    needs: [pre-check, build-windows, build-macos-arm, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -157,7 +132,6 @@ jobs:
           gh release create "v${VERSION}" \
             dist/Zeiterfassung_Setup.exe \
             dist/Zeiterfassung-${VERSION}-arm64.dmg \
-            dist/Zeiterfassung-${VERSION}-x86_64.dmg \
             dist/Zeiterfassung-${VERSION}-x86_64.AppImage \
             --title "Zeiterfassung v${VERSION}" \
             --generate-notes

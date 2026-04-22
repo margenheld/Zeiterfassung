@@ -50,8 +50,8 @@ Vorgefertigte Installer für alle drei Plattformen gibt es unter [Releases](../.
 **Windows**
 Lade `Zeiterfassung_Setup.exe` und führe den Installer aus. App installiert nach `%LOCALAPPDATA%\Programs\Zeiterfassung\`.
 
-**macOS**
-Lade `Zeiterfassung-<ver>-arm64.dmg` (Apple Silicon) oder `Zeiterfassung-<ver>-x86_64.dmg` (Intel) herunter. Öffne das DMG und ziehe die App in den Applications-Ordner. Beim ersten Start: Rechtsklick auf die App → „Öffnen" (Gatekeeper-Warnung bestätigen), oder im Terminal:
+**macOS** (Apple Silicon)
+Lade `Zeiterfassung-<ver>-arm64.dmg` herunter. Öffne das DMG und ziehe die App in den Applications-Ordner. Beim ersten Start: Rechtsklick auf die App → „Öffnen" (Gatekeeper-Warnung bestätigen), oder im Terminal:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Zeiterfassung.app

@@ -25,12 +25,22 @@ def _pyinstaller_common(extra_args):
     ]
 
 
-def build_windows():
-    inno_compiler = os.path.join(
-        os.environ.get("LOCALAPPDATA", ""),
-        "Programs", "Inno Setup 6", "ISCC.exe",
-    )
+def _find_inno_compiler():
+    """Return the path to ISCC.exe, or None if Inno Setup is not installed."""
+    on_path = shutil.which("ISCC")
+    if on_path:
+        return on_path
+    for candidate in (
+        os.path.join(os.environ.get("ProgramFiles(x86)", ""), "Inno Setup 6", "ISCC.exe"),
+        os.path.join(os.environ.get("ProgramFiles", ""), "Inno Setup 6", "ISCC.exe"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Inno Setup 6", "ISCC.exe"),
+    ):
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return None
 
+
+def build_windows():
     print(f"Building Zeiterfassung v{VERSION} (Windows) ...")
     cmd = _pyinstaller_common([
         "--onefile",
@@ -39,10 +49,11 @@ def build_windows():
     ])
     subprocess.run(cmd, check=True)
 
-    if not os.path.exists(inno_compiler):
-        print(f"Inno Setup not found at {inno_compiler} — skipping installer.")
+    inno_compiler = _find_inno_compiler()
+    if not inno_compiler:
+        print("Inno Setup not found on PATH or in standard locations — skipping installer.")
         return
-    print(f"Building installer v{VERSION} ...")
+    print(f"Building installer v{VERSION} with {inno_compiler} ...")
     subprocess.run([inno_compiler, f"/DAppVer={VERSION}", "installer.iss"], check=True)
     print("Installer created: dist/Zeiterfassung_Setup.exe")
 
