@@ -56,6 +56,10 @@ Dispatch on `platform.system()`:
 
 No swallowing of errors. The caller (UI) wraps the call in try/except and shows a `messagebox.showerror` with a traceback.
 
+### Import constraint
+
+The module uses `import os` and `import subprocess` (module imports, **not** `from os import startfile` / `from subprocess import run`). This is required so the unit tests can patch the calls via `src.platform_open.os.startfile` and `src.platform_open.subprocess.run`.
+
 ---
 
 ## 2. Settings dialog — new section "Gmail-Zugangsdaten"
@@ -152,9 +156,9 @@ A new method on `App`. Builds and shows a modal `Toplevel`:
   >
   > `Bitte erstelle ein Google Cloud Projekt mit Gmail API und lade die OAuth2 Client-ID als credentials.json in den Datenordner.`
 
-- Two buttons in a `tk.Frame` at the bottom:
-  - **"Datenordner öffnen"** (ACCENT-styled, like "Speichern"): calls `open_folder(self.base_path)`, then `dialog.destroy()`. Errors → `messagebox.showerror` with traceback (parent=dialog).
-  - **"OK"** (CELL_BG-styled, like "Abbrechen"): calls `dialog.destroy()`.
+- Two buttons in a `tk.Frame` at the bottom, packed left-to-right (matching the existing `Speichern` / `Abbrechen` order in `_open_settings`):
+  - **"Datenordner öffnen"** (ACCENT-styled, like "Speichern", `pack(side=tk.LEFT, padx=5)`): calls `open_folder(self.base_path)`, then `dialog.destroy()`. Errors → `messagebox.showerror` with traceback (parent=dialog).
+  - **"OK"** (CELL_BG-styled, like "Abbrechen", `pack(side=tk.LEFT, padx=5)`): calls `dialog.destroy()`.
 
 ### No auto-retry
 
