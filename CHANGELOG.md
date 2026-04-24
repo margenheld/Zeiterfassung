@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.7.0
+- Einstellungen: neue Sektion „Gmail-Zugangsdaten" am Anfang des Dialogs mit „Ordner öffnen"-Button und Live-Status (✓/✗) für `credentials.json` — kein Suchen mehr nach `~/Library/Application Support/Zeiterfassung` oder `%LOCALAPPDATA%\Programs\Zeiterfassung`
+- Sende-Fehler bei fehlender `credentials.json`: statt der Standard-Messagebox erscheint ein Dialog im Dark-Theme mit zwei Buttons („Datenordner öffnen" / „OK") — ein Klick öffnet das richtige Verzeichnis
+- Status-Label aktualisiert sich live alle 500 ms, solange der Settings-Dialog offen ist (kein Neuöffnen mehr nötig nach dem Reinkopieren)
+- Monat/Woche-Toggle springt jetzt immer auf den aktuellen Monat / die aktuelle KW (vorher: behielt die zuletzt angezeigte Scroll-Position)
+
 ## v1.6.0
 - Installer für macOS (DMG, Apple Silicon und Intel) und Linux (AppImage) zusätzlich zum bestehenden Windows-Installer
 - Autostart jetzt auch unter macOS (LaunchAgent) und Linux (`.desktop`-Datei unter `~/.config/autostart/`)
