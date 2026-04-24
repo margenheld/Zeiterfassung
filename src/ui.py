@@ -20,6 +20,7 @@ from src.mail import (
     TokenNetworkError,
 )
 from src.autostart import enable_autostart, disable_autostart
+from src.platform_open import open_folder
 from src.version import VERSION
 
 DAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
@@ -33,6 +34,7 @@ BG = "#1a1a2e"
 CELL_BG = "#16213e"
 WEEKEND_BG = "#0f3460"
 ACCENT = "#e94560"
+STATUS_OK = "#4ade80"
 TEXT = "#e0e0e0"
 TEXT_MUTED = "#888888"
 ENTRY_BG = "#1a3a5c"
@@ -301,10 +303,55 @@ class App:
 
         self._apply_combobox_style(dialog)
 
+        # Gmail-Zugangsdaten section
+        tk.Label(
+            dialog, text="— Gmail-Zugangsdaten —", font=FONT_BOLD,
+            bg=BG, fg=TEXT_MUTED
+        ).grid(row=0, column=0, columnspan=2, padx=10, pady=(8, 4))
+
+        creds_path = os.path.join(self.base_path, "credentials.json")
+        creds_present = os.path.exists(creds_path)
+
+        tk.Label(
+            dialog, text="Datenordner:", font=FONT, bg=BG, fg=TEXT
+        ).grid(row=1, column=0, padx=10, pady=4, sticky="w")
+
+        creds_row = tk.Frame(dialog, bg=BG)
+        creds_row.grid(row=1, column=1, padx=10, pady=4, sticky="w")
+
+        def open_data_folder():
+            try:
+                open_folder(self.base_path)
+            except Exception as e:
+                messagebox.showerror(
+                    "Ordner konnte nicht geöffnet werden",
+                    f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}",
+                    parent=dialog,
+                )
+
+        tk.Button(
+            creds_row, text="Ordner öffnen", command=open_data_folder,
+            font=FONT, bg=CELL_BG, fg=TEXT,
+            activebackground=ENTRY_BG, activeforeground=TEXT,
+            relief=tk.FLAT, padx=12, pady=2, cursor="hand2"
+        ).pack(side=tk.LEFT)
+
+        if creds_present:
+            status_text = "✓ credentials.json vorhanden"
+            status_fg = STATUS_OK
+        else:
+            status_text = "✗ credentials.json fehlt"
+            status_fg = ACCENT
+
+        tk.Label(
+            creds_row, text=status_text, font=FONT_SMALL,
+            bg=BG, fg=status_fg
+        ).pack(side=tk.LEFT, padx=(10, 0))
+
         # Email
         tk.Label(
             dialog, text="Absender:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=0, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=2, column=0, padx=10, pady=8, sticky="w")
 
         email_var = tk.StringVar(value=self.settings.get("email"))
         tk.Entry(
@@ -312,45 +359,45 @@ class App:
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=0, column=1, padx=10, pady=8)
+        ).grid(row=2, column=1, padx=10, pady=8)
 
         # Default start time
         tk.Label(
             dialog, text="Standard-Start:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=1, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=3, column=0, padx=10, pady=8, sticky="w")
 
         start_var = tk.StringVar(value=self.settings.get("default_start"))
         ttk.Combobox(
             dialog, textvariable=start_var, values=TIME_VALUES,
             width=8, font=FONT, style="Dark.TCombobox", state="readonly"
-        ).grid(row=1, column=1, padx=10, pady=8)
+        ).grid(row=3, column=1, padx=10, pady=8)
 
         # Default end time
         tk.Label(
             dialog, text="Standard-Ende:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=2, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=4, column=0, padx=10, pady=8, sticky="w")
 
         end_var = tk.StringVar(value=self.settings.get("default_end"))
         ttk.Combobox(
             dialog, textvariable=end_var, values=TIME_VALUES,
             width=8, font=FONT, style="Dark.TCombobox", state="readonly"
-        ).grid(row=2, column=1, padx=10, pady=8)
+        ).grid(row=4, column=1, padx=10, pady=8)
 
         # Default pause
         tk.Label(
             dialog, text="Standard-Pause (Min):", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=3, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=5, column=0, padx=10, pady=8, sticky="w")
 
         pause_var = tk.StringVar(value=str(self.settings.get("default_pause")))
         ttk.Combobox(
             dialog, textvariable=pause_var, values=PAUSE_VALUES,
             width=8, font=FONT, style="Dark.TCombobox", state="readonly"
-        ).grid(row=3, column=1, padx=10, pady=8)
+        ).grid(row=5, column=1, padx=10, pady=8)
 
         # Recipient
         tk.Label(
             dialog, text="Empfänger:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=4, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=6, column=0, padx=10, pady=8, sticky="w")
 
         recipient_var = tk.StringVar(value=self.settings.get("recipient"))
         tk.Entry(
@@ -358,12 +405,12 @@ class App:
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=4, column=1, padx=10, pady=8)
+        ).grid(row=6, column=1, padx=10, pady=8)
 
         # Name
         tk.Label(
             dialog, text="Name:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=5, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=7, column=0, padx=10, pady=8, sticky="w")
 
         name_var = tk.StringVar(value=self.settings.get("name"))
         tk.Entry(
@@ -371,12 +418,12 @@ class App:
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=5, column=1, padx=10, pady=8)
+        ).grid(row=7, column=1, padx=10, pady=8)
 
         # Stundenlohn (optional)
         tk.Label(
             dialog, text="Stundenlohn (€):", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=6, column=0, padx=10, pady=8, sticky="w")
+        ).grid(row=8, column=0, padx=10, pady=8, sticky="w")
 
         rate_var = tk.StringVar(value=str(self.settings.get("hourly_rate") or ""))
         tk.Entry(
@@ -384,68 +431,68 @@ class App:
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=6, column=1, padx=10, pady=8, sticky="w")
+        ).grid(row=8, column=1, padx=10, pady=8, sticky="w")
 
         tk.Label(
             dialog, text="(optional – nur für dich sichtbar)", font=FONT_SMALL,
             bg=BG, fg=TEXT_MUTED
-        ).grid(row=6, column=1, padx=(120, 10), pady=8, sticky="w")
+        ).grid(row=8, column=1, padx=(120, 10), pady=8, sticky="w")
 
         # Mail-Vorlage
         tk.Label(
             dialog, text="— Mail-Vorlage —", font=FONT_BOLD, bg=BG, fg=TEXT_MUTED
-        ).grid(row=7, column=0, columnspan=2, padx=10, pady=(16, 4))
+        ).grid(row=9, column=0, columnspan=2, padx=10, pady=(16, 4))
 
         tk.Label(
             dialog, text="Betreff:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=8, column=0, padx=10, pady=4, sticky="w")
+        ).grid(row=10, column=0, padx=10, pady=4, sticky="w")
         subject_var = tk.StringVar(value=self.settings.get("mail_subject"))
         tk.Entry(
             dialog, textvariable=subject_var, width=35, font=FONT,
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=8, column=1, padx=10, pady=4)
+        ).grid(row=10, column=1, padx=10, pady=4)
 
         tk.Label(
             dialog, text="Anrede:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=9, column=0, padx=10, pady=4, sticky="w")
+        ).grid(row=11, column=0, padx=10, pady=4, sticky="w")
         greeting_var = tk.StringVar(value=self.settings.get("mail_greeting"))
         tk.Entry(
             dialog, textvariable=greeting_var, width=35, font=FONT,
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1
-        ).grid(row=9, column=1, padx=10, pady=4)
+        ).grid(row=11, column=1, padx=10, pady=4)
 
         tk.Label(
             dialog, text="Inhalt:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=10, column=0, padx=10, pady=4, sticky="nw")
+        ).grid(row=12, column=0, padx=10, pady=4, sticky="nw")
         content_text = tk.Text(
             dialog, width=35, height=3, font=FONT,
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1, wrap=tk.WORD
         )
-        content_text.grid(row=10, column=1, padx=10, pady=4)
+        content_text.grid(row=12, column=1, padx=10, pady=4)
         content_text.insert("1.0", self.settings.get("mail_content"))
 
         tk.Label(
             dialog, text="Gruß:", font=FONT, bg=BG, fg=TEXT
-        ).grid(row=11, column=0, padx=10, pady=4, sticky="nw")
+        ).grid(row=13, column=0, padx=10, pady=4, sticky="nw")
         closing_text = tk.Text(
             dialog, width=35, height=2, font=FONT,
             bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
             relief=tk.FLAT, highlightbackground=TEXT_MUTED,
             highlightcolor=ACCENT, highlightthickness=1, wrap=tk.WORD
         )
-        closing_text.grid(row=11, column=1, padx=10, pady=4)
+        closing_text.grid(row=13, column=1, padx=10, pady=4)
         closing_text.insert("1.0", self.settings.get("mail_closing"))
 
         tk.Label(
             dialog, text="Platzhalter: {zeitraum}, {gesamt}", font=("Segoe UI", 8),
             bg=BG, fg=TEXT_MUTED
-        ).grid(row=12, column=0, columnspan=2, padx=10, pady=(0, 4))
+        ).grid(row=14, column=0, columnspan=2, padx=10, pady=(0, 4))
 
         # Autostart
         autostart_var = tk.BooleanVar(value=self.settings.get("autostart"))
@@ -455,7 +502,7 @@ class App:
             bg=BG, fg=TEXT, selectcolor=CELL_BG,
             activebackground=BG, activeforeground=TEXT,
             cursor="hand2"
-        ).grid(row=13, column=0, columnspan=2, padx=10, pady=8, sticky="w")
+        ).grid(row=15, column=0, columnspan=2, padx=10, pady=8, sticky="w")
 
         def save_settings():
             ok, msg = validate_entry(start_var.get(), end_var.get())
@@ -501,7 +548,7 @@ class App:
             dialog.destroy()
 
         btn_frame = tk.Frame(dialog, bg=BG)
-        btn_frame.grid(row=14, column=0, columnspan=2, pady=12)
+        btn_frame.grid(row=16, column=0, columnspan=2, pady=12)
 
         tk.Button(
             btn_frame, text="Speichern", command=save_settings, font=FONT_BOLD,
