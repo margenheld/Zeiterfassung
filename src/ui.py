@@ -853,6 +853,54 @@ class App:
             relief=tk.FLAT, padx=16, pady=4, cursor="hand2"
         ).pack(side=tk.LEFT, padx=5)
 
+    def _show_missing_credentials_dialog(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Keine Zugangsdaten")
+        dialog.resizable(False, False)
+        dialog.grab_set()
+        dialog.configure(bg=BG)
+
+        tk.Label(
+            dialog,
+            text=(
+                "credentials.json nicht gefunden.\n\n"
+                "Bitte erstelle ein Google Cloud Projekt mit Gmail API "
+                "und lade die OAuth2 Client-ID als credentials.json in "
+                "den Datenordner."
+            ),
+            font=FONT, bg=BG, fg=TEXT,
+            wraplength=380, justify="left",
+        ).grid(row=0, column=0, columnspan=2, padx=20, pady=(20, 12))
+
+        def open_and_close():
+            try:
+                open_folder(self.base_path)
+            except Exception as e:
+                messagebox.showerror(
+                    "Ordner konnte nicht geöffnet werden",
+                    f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}",
+                    parent=dialog,
+                )
+                return
+            dialog.destroy()
+
+        btn_frame = tk.Frame(dialog, bg=BG)
+        btn_frame.grid(row=1, column=0, columnspan=2, pady=(0, 16))
+
+        tk.Button(
+            btn_frame, text="Datenordner öffnen", command=open_and_close,
+            font=FONT_BOLD, bg=ACCENT, fg="#ffffff",
+            activebackground="#c73550", activeforeground="#ffffff",
+            relief=tk.FLAT, padx=16, pady=4, cursor="hand2",
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame, text="OK", command=dialog.destroy,
+            font=FONT, bg=CELL_BG, fg=TEXT,
+            activebackground=ENTRY_BG, activeforeground=TEXT,
+            relief=tk.FLAT, padx=16, pady=4, cursor="hand2",
+        ).pack(side=tk.LEFT, padx=5)
+
     def _send_report(self):
         recipient = self.settings.get("recipient")
         if not recipient:
@@ -867,13 +915,7 @@ class App:
         token_path = os.path.join(self.base_path, "token.json")
 
         if not os.path.exists(credentials_path):
-            messagebox.showerror(
-                "Keine Zugangsdaten",
-                "credentials.json nicht gefunden.\n\n"
-                "Bitte erstelle ein Google Cloud Projekt mit Gmail API "
-                "und lade die OAuth2 Client-ID als credentials.json herunter.",
-                parent=self.root
-            )
+            self._show_missing_credentials_dialog()
             return
 
         # Date range dialog
