@@ -310,7 +310,6 @@ class App:
         ).grid(row=0, column=0, columnspan=2, padx=10, pady=(8, 4))
 
         creds_path = os.path.join(self.base_path, "credentials.json")
-        creds_present = os.path.exists(creds_path)
 
         tk.Label(
             dialog, text="Datenordner:", font=FONT, bg=BG, fg=TEXT
@@ -336,17 +335,25 @@ class App:
             relief=tk.FLAT, padx=12, pady=2, cursor="hand2"
         ).pack(side=tk.LEFT)
 
-        if creds_present:
-            status_text = "✓ credentials.json vorhanden"
-            status_fg = STATUS_OK
-        else:
-            status_text = "✗ credentials.json fehlt"
-            status_fg = ACCENT
+        status_label = tk.Label(
+            creds_row, text="", font=FONT_SMALL, bg=BG
+        )
+        status_label.pack(side=tk.LEFT, padx=(10, 0))
 
-        tk.Label(
-            creds_row, text=status_text, font=FONT_SMALL,
-            bg=BG, fg=status_fg
-        ).pack(side=tk.LEFT, padx=(10, 0))
+        def refresh_status():
+            if not status_label.winfo_exists():
+                return
+            if os.path.exists(creds_path):
+                status_label.config(
+                    text="✓ credentials.json vorhanden", fg=STATUS_OK
+                )
+            else:
+                status_label.config(
+                    text="✗ credentials.json fehlt", fg=ACCENT
+                )
+            dialog.after(500, refresh_status)
+
+        refresh_status()
 
         # Email
         tk.Label(
