@@ -249,17 +249,14 @@ class App:
     def _set_view(self, mode):
         if mode == self.view_mode:
             return
+        today = datetime.date.today()
         if mode == "week":
-            # Jump to first KW of current month
-            first_day = datetime.date(self.year, self.month, 1)
-            iso = first_day.isocalendar()
+            iso = today.isocalendar()
             self.iso_year = iso[0]
             self.current_week = iso[1]
         else:
-            # Jump to month containing Monday of current week
-            monday = datetime.date.fromisocalendar(self.iso_year, self.current_week, 1)
-            self.year = monday.year
-            self.month = monday.month
+            self.year = today.year
+            self.month = today.month
         self.view_mode = mode
         self._update_toggle_style()
         self._refresh()
