@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.8.1
+- Feiertagsnamen erscheinen jetzt korrekt auf Deutsch (z.B. „Tag der Deutschen Einheit" statt „German Unity Day"). `python-holidays` wird mit `language="de"` aufgerufen — vorher griff der englische Default
+
 ## v1.8.0
 - Gesetzliche Feiertage werden im Monats- und Wochenkalender grün markiert, sobald in den Einstellungen ein Bundesland gewählt ist — Default „— kein Bundesland —" lässt das Verhalten für Bestandsnutzer unverändert
 - Tooltip beim Hover zeigt den vollen Feiertagsnamen, sobald der Name in der Zelle truncated ist

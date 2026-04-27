@@ -28,7 +28,7 @@ _VALID_CODES = {code for code, _ in STATES if code}
 @lru_cache(maxsize=64)
 def _holidays_cached(state_code: str, year: int) -> dict[date, str]:
     import holidays
-    return dict(holidays.Germany(subdiv=state_code, years=year))
+    return dict(holidays.Germany(subdiv=state_code, years=year, language="de"))
 
 
 def get_holidays(state_code: str, year: int) -> dict[date, str]:
