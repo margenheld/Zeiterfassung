@@ -71,6 +71,8 @@ class App:
         self._build_header()
         self._build_grid()
         self._build_footer()
+        self.root.bind("<Left>", lambda e: self._prev())
+        self.root.bind("<Right>", lambda e: self._next())
         self._refresh()
         self._proactive_token_refresh()
 
