@@ -345,6 +345,11 @@ class App:
         entries = self.storage.get_all()
         total_hours = 0.0
         spans = week_spans_months(self.iso_year, self.current_week)
+        state = self.settings.get("state")
+        holidays_map: dict[datetime.date, str] = {}
+        if state:
+            for y in {dates[0].year, dates[-1].year}:
+                holidays_map.update(get_holidays(state, y))
 
         for col, day_date in enumerate(dates):
             date_str = day_date.isoformat()
@@ -382,6 +387,17 @@ class App:
                     w.bind("<Button-3>", lambda e, d=date_str: self._delete_entry(d))
                     w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
                     w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
+                if day_date in holidays_map:
+                    for w in (cell, day_lbl, time_lbl):
+                        attach_tooltip(w, f"Feiertag: {holidays_map[day_date]}")
+            elif day_date in holidays_map:
+                cell = self._build_holiday_cell(
+                    new_frame,
+                    day_text=day_text,
+                    name=holidays_map[day_date],
+                    max_name_len=18,
+                    on_click=lambda d=date_str: self._open_dialog(d),
+                )
             else:
                 bg = WEEKEND_BG if is_weekend else CELL_BG
                 hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
