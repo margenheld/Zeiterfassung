@@ -112,7 +112,7 @@ def open_settings_dialog(parent, settings, base_path, on_change):
         STATES[0][1],
     )
     state_var = tk.StringVar(value=current_label)
-    dark_combo(dialog, state_var, state_labels).grid(row=9, column=1, padx=10, pady=8)
+    dark_combo(dialog, state_var, state_labels, width=22).grid(row=9, column=1, padx=10, pady=8)
 
     tk.Label(
         dialog, text="— Mail-Vorlage —", font=FONT_BOLD, bg=BG, fg=TEXT_MUTED,

@@ -351,6 +351,14 @@ class App:
             for y in {dates[0].year, dates[-1].year}:
                 holidays_map.update(get_holidays(state, y))
 
+        # Probe-Label, um die natürliche Pixel-Größe einer Standard-Wochenzelle
+        # zu ermitteln. Holiday-Zellen werden auf diese Größe fixiert, damit
+        # längere Feiertagsnamen die Spalte nicht aufweiten.
+        probe = tk.Label(new_frame, text="", font=FONT, width=8, height=5)
+        probe.update_idletasks()
+        cell_size = (probe.winfo_reqwidth(), probe.winfo_reqheight())
+        probe.destroy()
+
         for col, day_date in enumerate(dates):
             date_str = day_date.isoformat()
             entry = entries.get(date_str)
@@ -397,6 +405,7 @@ class App:
                     name=holidays_map[day_date],
                     max_name_len=18,
                     on_click=lambda d=date_str: self._open_dialog(d),
+                    cell_size=cell_size,
                 )
             else:
                 bg = WEEKEND_BG if is_weekend else CELL_BG
@@ -437,31 +446,42 @@ class App:
             return text
         return text[: max_len - 1] + "…"
 
-    def _build_holiday_cell(self, parent, day_text, name, max_name_len, on_click):
-        """Grüne Feiertagszelle. Layout analog zur Eintragszelle."""
+    def _build_holiday_cell(self, parent, day_text, name, max_name_len, on_click, cell_size=None):
+        """Grüne Feiertagszelle. Layout analog zur Eintragszelle.
+
+        cell_size: optional (width_px, height_px). Wenn gesetzt, wird der Frame
+        auf diese Pixel-Größe fixiert (verhindert Aufweitung der Spalte durch
+        längere Namen — relevant für die Wochenansicht).
+        """
         cell = tk.Frame(
             parent, bg=HOLIDAY_BG, relief=tk.SOLID,
             highlightbackground=HOLIDAY_ACCENT, highlightthickness=1,
             cursor="hand2",
         )
+        if cell_size is not None:
+            cell.config(width=cell_size[0], height=cell_size[1])
+            cell.pack_propagate(False)
         day_lbl = tk.Label(
             cell, text=day_text, font=FONT,
             bg=HOLIDAY_BG, fg=TEXT, cursor="hand2",
         )
         day_lbl.pack(pady=(4, 0))
+        truncated = self._truncate(name, max_name_len)
         name_lbl = tk.Label(
-            cell, text=self._truncate(name, max_name_len),
+            cell, text=truncated,
             font=FONT_SMALL, bg=HOLIDAY_BG, fg=TEXT_MUTED, cursor="hand2",
         )
         name_lbl.pack(pady=(0, 4))
 
+        is_truncated = truncated != name
         for w in (cell, day_lbl, name_lbl):
             w.bind("<Button-1>", lambda e: on_click())
             w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, nl=name_lbl:
                 self._cell_hover(c, dl, nl, HOLIDAY_BG_HOVER))
             w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, nl=name_lbl:
                 self._cell_hover(c, dl, nl, HOLIDAY_BG))
-            attach_tooltip(w, name)
+            if is_truncated:
+                attach_tooltip(w, name)
         return cell
 
     @staticmethod
