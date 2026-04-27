@@ -11,6 +11,7 @@ from src.theme import (
     apply_combobox_style, dark_combo, dark_entry, dark_text,
     primary_button, secondary_button,
 )
+from src.holidays_de import STATES
 from src.time_utils import validate_entry
 
 
@@ -103,32 +104,42 @@ def open_settings_dialog(parent, settings, base_path, on_change):
         bg=BG, fg=TEXT_MUTED,
     ).grid(row=8, column=1, padx=(120, 10), pady=8, sticky="w")
 
+    label("Bundesland:", row=9)
+    state_labels = [lbl for _, lbl in STATES]
+    current_code = settings.get("state")
+    current_label = next(
+        (lbl for code, lbl in STATES if code == current_code),
+        STATES[0][1],
+    )
+    state_var = tk.StringVar(value=current_label)
+    dark_combo(dialog, state_var, state_labels).grid(row=9, column=1, padx=10, pady=8)
+
     tk.Label(
         dialog, text="— Mail-Vorlage —", font=FONT_BOLD, bg=BG, fg=TEXT_MUTED,
-    ).grid(row=9, column=0, columnspan=2, padx=10, pady=(16, 4))
+    ).grid(row=10, column=0, columnspan=2, padx=10, pady=(16, 4))
 
-    label("Betreff:", row=10, pady=4)
+    label("Betreff:", row=11, pady=4)
     subject_var = tk.StringVar(value=settings.get("mail_subject"))
-    dark_entry(dialog, subject_var, width=35).grid(row=10, column=1, padx=10, pady=4)
+    dark_entry(dialog, subject_var, width=35).grid(row=11, column=1, padx=10, pady=4)
 
-    label("Anrede:", row=11, pady=4)
+    label("Anrede:", row=12, pady=4)
     greeting_var = tk.StringVar(value=settings.get("mail_greeting"))
-    dark_entry(dialog, greeting_var, width=35).grid(row=11, column=1, padx=10, pady=4)
+    dark_entry(dialog, greeting_var, width=35).grid(row=12, column=1, padx=10, pady=4)
 
-    label("Inhalt:", row=12, pady=4, sticky="nw")
+    label("Inhalt:", row=13, pady=4, sticky="nw")
     content_text = dark_text(dialog, 35, 3)
-    content_text.grid(row=12, column=1, padx=10, pady=4)
+    content_text.grid(row=13, column=1, padx=10, pady=4)
     content_text.insert("1.0", settings.get("mail_content"))
 
-    label("Gruß:", row=13, pady=4, sticky="nw")
+    label("Gruß:", row=14, pady=4, sticky="nw")
     closing_text = dark_text(dialog, 35, 2)
-    closing_text.grid(row=13, column=1, padx=10, pady=4)
+    closing_text.grid(row=14, column=1, padx=10, pady=4)
     closing_text.insert("1.0", settings.get("mail_closing"))
 
     tk.Label(
         dialog, text="Platzhalter: {zeitraum}, {gesamt}", font=("Segoe UI", 8),
         bg=BG, fg=TEXT_MUTED,
-    ).grid(row=14, column=0, columnspan=2, padx=10, pady=(0, 4))
+    ).grid(row=15, column=0, columnspan=2, padx=10, pady=(0, 4))
 
     autostart_var = tk.BooleanVar(value=settings.get("autostart"))
     tk.Checkbutton(
@@ -137,7 +148,7 @@ def open_settings_dialog(parent, settings, base_path, on_change):
         bg=BG, fg=TEXT, selectcolor=CELL_BG,
         activebackground=BG, activeforeground=TEXT,
         cursor="hand2",
-    ).grid(row=15, column=0, columnspan=2, padx=10, pady=8, sticky="w")
+    ).grid(row=16, column=0, columnspan=2, padx=10, pady=8, sticky="w")
 
     def save_settings():
         ok, msg = validate_entry(start_var.get(), end_var.get())
@@ -179,11 +190,17 @@ def open_settings_dialog(parent, settings, base_path, on_change):
             settings.set("hourly_rate", float(rate_str) if rate_str else 0.0)
         except ValueError:
             settings.set("hourly_rate", 0.0)
+        selected_label = state_var.get()
+        selected_code = next(
+            (code for code, lbl in STATES if lbl == selected_label),
+            "",
+        )
+        settings.set("state", selected_code)
         on_change()
         dialog.destroy()
 
     btn_frame = tk.Frame(dialog, bg=BG)
-    btn_frame.grid(row=16, column=0, columnspan=2, pady=12)
+    btn_frame.grid(row=17, column=0, columnspan=2, pady=12)
 
     primary_button(btn_frame, "Speichern", save_settings).pack(side=tk.LEFT, padx=5)
     secondary_button(btn_frame, "Abbrechen", dialog.destroy).pack(side=tk.LEFT, padx=5)
