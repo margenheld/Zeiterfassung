@@ -3,11 +3,29 @@ import os
 import platform
 import plistlib
 import subprocess
+import sys
 import tempfile
 
 
 SHORTCUT_NAME = "Zeiterfassung.lnk"
 MACOS_LABEL = "com.margenheld.zeiterfassung"
+
+
+def resolve_autostart_target(base_path):
+    """Return (target, arguments) for the current runtime/platform.
+
+    Frozen Windows/macOS: the executable itself.
+    Frozen Linux: $APPIMAGE if set (persistent path), otherwise sys.executable.
+    Script mode: Python interpreter + main.py.
+    """
+    if getattr(sys, "frozen", False):
+        if platform.system() == "Linux":
+            target = os.environ.get("APPIMAGE") or sys.executable
+        else:
+            target = sys.executable
+        return target, "--minimized"
+    main_py = os.path.join(base_path, "src", "main.py")
+    return sys.executable, f"{main_py} --minimized"
 
 
 def _get_startup_folder():
