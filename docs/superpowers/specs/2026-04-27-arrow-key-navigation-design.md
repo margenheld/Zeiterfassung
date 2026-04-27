@@ -21,7 +21,7 @@ Voraussetzung "Hauptfenster ist fokussiert" wird **implizit** erfüllt: Tk schic
 
 ### `src/ui.py::App.__init__`
 
-Direkt nach `_build_footer()` (aktuell Zeile 73) zwei Bindings ergänzen:
+Direkt nach dem `_build_footer()`-Aufruf in `__init__` (aktuell Zeile 73) zwei Bindings ergänzen:
 
 ```python
 self._build_header()
