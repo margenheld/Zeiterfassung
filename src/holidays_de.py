@@ -26,13 +26,20 @@ _VALID_CODES = {code for code, _ in STATES if code}
 
 
 @lru_cache(maxsize=64)
+def _holidays_cached(state_code: str, year: int) -> dict[date, str]:
+    import holidays
+    return dict(holidays.Germany(subdiv=state_code, years=year))
+
+
 def get_holidays(state_code: str, year: int) -> dict[date, str]:
     """Liefert {date: name} für gewähltes Bundesland und Jahr.
 
     Leerer oder ungültiger Code → leeres Dict (silent fallback,
     damit ein versehentlich falsch gespeicherter Code keinen Crash auslöst).
+
+    Rückgabe ist immer ein frisches Dict; Mutationen durch Aufrufer können
+    den internen Cache nicht vergiften.
     """
     if state_code not in _VALID_CODES:
         return {}
-    import holidays
-    return dict(holidays.Germany(subdiv=state_code, years=year))
+    return dict(_holidays_cached(state_code, year))

@@ -40,3 +40,10 @@ def test_tag_der_deutschen_einheit_in_every_state():
         if not code:
             continue
         assert date(2026, 10, 3) in get_holidays(code, 2026)
+
+
+def test_returned_dict_is_independent_copy():
+    h1 = get_holidays("BY", 2026)
+    h1[date(2099, 1, 1)] = "MUTATION"
+    h2 = get_holidays("BY", 2026)
+    assert date(2099, 1, 1) not in h2
