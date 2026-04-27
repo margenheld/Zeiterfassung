@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.0
+- Gesetzliche Feiertage werden im Monats- und Wochenkalender grün markiert, sobald in den Einstellungen ein Bundesland gewählt ist — Default „— kein Bundesland —" lässt das Verhalten für Bestandsnutzer unverändert
+- Tooltip beim Hover zeigt den vollen Feiertagsnamen, sobald der Name in der Zelle truncated ist
+- Beim Anlegen eines neuen Eintrags an einem Feiertag erscheint eine Bestätigungs-Warnung mit Datum und Feiertagsname (kein Hinweis beim Bearbeiten bestehender Einträge)
+- Tag mit Eintrag und Feiertag: rote Eintragszelle bleibt visuell dominant, Tooltip zeigt zusätzlich den Feiertagsnamen
+- Datenquelle: `python-holidays` (offline gebündelt, alle 16 Bundesländer)
+
 ## v1.7.0
 - Einstellungen: neue Sektion „Gmail-Zugangsdaten" am Anfang des Dialogs mit „Ordner öffnen"-Button und Live-Status (✓/✗) für `credentials.json` — kein Suchen mehr nach `~/Library/Application Support/Zeiterfassung` oder `%LOCALAPPDATA%\Programs\Zeiterfassung`
 - Sende-Fehler bei fehlender `credentials.json`: statt der Standard-Messagebox erscheint ein Dialog im Dark-Theme mit zwei Buttons („Datenordner öffnen" / „OK") — ein Klick öffnet das richtige Verzeichnis
