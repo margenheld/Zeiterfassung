@@ -1,3 +1,6 @@
+import os
+from unittest import mock
+
 import pytest
 from src.storage import Storage
 
@@ -37,3 +40,40 @@ def test_save_default_pause_zero(tmp_storage):
     tmp_storage.save("2026-03-23", "08:00", "16:30")
     entry = tmp_storage.get("2026-03-23")
     assert entry == {"start": "08:00", "end": "16:30", "pause": 0}
+
+
+def test_corrupt_json_is_quarantined_and_starts_empty(tmp_path):
+    path = tmp_path / "test.json"
+    path.write_text("{not valid json", encoding="utf-8")
+
+    storage = Storage(str(path))
+
+    assert storage.get_all() == {}
+    quarantined = list(tmp_path.glob("test.json.corrupt-*"))
+    assert len(quarantined) == 1
+    assert quarantined[0].read_text(encoding="utf-8") == "{not valid json"
+
+
+def test_save_failure_keeps_original_file_intact(tmp_path):
+    path = tmp_path / "test.json"
+    storage = Storage(str(path))
+    storage.save("2026-03-23", "08:00", "16:30")
+    original_bytes = path.read_bytes()
+
+    with mock.patch("os.replace", side_effect=OSError("disk full")):
+        with pytest.raises(OSError):
+            storage.save("2026-03-24", "09:00", "17:00")
+
+    assert path.read_bytes() == original_bytes
+    leftovers = [p for p in tmp_path.iterdir() if p.suffix == ".tmp"]
+    assert leftovers == []
+
+
+def test_save_does_not_leave_tmp_files(tmp_path):
+    path = tmp_path / "test.json"
+    storage = Storage(str(path))
+    storage.save("2026-03-23", "08:00", "16:30")
+    storage.save("2026-03-24", "09:00", "17:00")
+
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+    assert leftovers == []
