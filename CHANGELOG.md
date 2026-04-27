@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.8.3
+- Pfeiltasten `<Left>` / `<Right>` navigieren im Hauptfenster durch Monate bzw. Wochen — analog zu den `‹`/`›` Buttons im Header. Modal-Dialoge fangen die Tasten automatisch ab, sodass `<Left>`/`<Right>` in Eingabefeldern weiterhin den Cursor bewegen
+
 ## v1.8.2
 - Doppelter Tooltip an Feiertags-/Eintragszellen behoben: `attach_tooltip` wird jetzt nur am äußersten Frame gebunden und erkennt beim Pointer-Übergang in Child-Widgets, dass die Maus weiterhin im Cluster ist (keine Re-Open-Stacking)
 
