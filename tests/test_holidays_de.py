@@ -42,6 +42,12 @@ def test_tag_der_deutschen_einheit_in_every_state():
         assert date(2026, 10, 3) in get_holidays(code, 2026)
 
 
+def test_holiday_names_are_german():
+    h = get_holidays("BY", 2026)
+    assert h[date(2026, 10, 3)] == "Tag der Deutschen Einheit"
+    assert h[date(2026, 1, 6)] == "Heilige Drei Könige"
+
+
 def test_returned_dict_is_independent_copy():
     h1 = get_holidays("BY", 2026)
     h1[date(2099, 1, 1)] = "MUTATION"
