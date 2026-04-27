@@ -287,8 +287,7 @@ class App:
                         w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
                         w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
                     if day_date in holidays_map:
-                        for w in (cell, day_lbl, time_lbl):
-                            attach_tooltip(w, f"Feiertag: {holidays_map[day_date]}")
+                        attach_tooltip(cell, f"Feiertag: {holidays_map[day_date]}")
                 elif day_date in holidays_map:
                     cell = self._build_holiday_cell(
                         new_frame,
@@ -396,8 +395,7 @@ class App:
                     w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
                     w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
                 if day_date in holidays_map:
-                    for w in (cell, day_lbl, time_lbl):
-                        attach_tooltip(w, f"Feiertag: {holidays_map[day_date]}")
+                    attach_tooltip(cell, f"Feiertag: {holidays_map[day_date]}")
             elif day_date in holidays_map:
                 cell = self._build_holiday_cell(
                     new_frame,
@@ -476,15 +474,16 @@ class App:
             name_lbl.config(wraplength=cell_size[0] - 6, justify="center")
         name_lbl.pack(pady=(0, 4))
 
-        is_truncated = truncated != name
         for w in (cell, day_lbl, name_lbl):
             w.bind("<Button-1>", lambda e: on_click())
             w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, nl=name_lbl:
                 self._cell_hover(c, dl, nl, HOLIDAY_BG_HOVER))
             w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, nl=name_lbl:
                 self._cell_hover(c, dl, nl, HOLIDAY_BG))
-            if is_truncated:
-                attach_tooltip(w, name)
+        if truncated != name:
+            # Nur am äußersten Frame binden, sonst gleichzeitige Tooltips, weil
+            # Tk Enter-Events an Frame und Child unabhängig schickt.
+            attach_tooltip(cell, name)
         return cell
 
     @staticmethod

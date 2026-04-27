@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.8.2
+- Doppelter Tooltip an Feiertags-/Eintragszellen behoben: `attach_tooltip` wird jetzt nur am äußersten Frame gebunden und erkennt beim Pointer-Übergang in Child-Widgets, dass die Maus weiterhin im Cluster ist (keine Re-Open-Stacking)
+
 ## v1.8.1
 - Feiertagsnamen erscheinen jetzt korrekt auf Deutsch (z.B. „Tag der Deutschen Einheit" statt „German Unity Day"). `python-holidays` wird mit `language="de"` aufgerufen — vorher griff der englische Default
 
