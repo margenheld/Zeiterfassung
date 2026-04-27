@@ -1,9 +1,9 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 
 from src.theme import (
-    ACCENT, ACCENT_HOVER, BG, CELL_BG, ENTRY_BG, FONT, FONT_BOLD,
-    PAUSE_VALUES, TEXT, TIME_VALUES, apply_combobox_style,
+    BG, FONT, PAUSE_VALUES, TEXT, TIME_VALUES,
+    apply_combobox_style, dark_combo, primary_button, secondary_button,
 )
 from src.time_utils import validate_entry
 
@@ -24,29 +24,18 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change):
 
     apply_combobox_style(dialog)
 
-    tk.Label(
-        dialog, text="Start:", font=FONT, bg=BG, fg=TEXT,
-    ).grid(row=0, column=0, padx=10, pady=8, sticky="w")
-
+    tk.Label(dialog, text="Start:", font=FONT, bg=BG, fg=TEXT).grid(
+        row=0, column=0, padx=10, pady=8, sticky="w")
     start_var = tk.StringVar(value=entry["start"] if entry else settings.get("default_start"))
-    ttk.Combobox(
-        dialog, textvariable=start_var, values=TIME_VALUES,
-        width=8, font=FONT, style="Dark.TCombobox", state="readonly",
-    ).grid(row=0, column=1, padx=10, pady=8)
+    dark_combo(dialog, start_var, TIME_VALUES).grid(row=0, column=1, padx=10, pady=8)
 
-    tk.Label(
-        dialog, text="Ende:", font=FONT, bg=BG, fg=TEXT,
-    ).grid(row=1, column=0, padx=10, pady=8, sticky="w")
-
+    tk.Label(dialog, text="Ende:", font=FONT, bg=BG, fg=TEXT).grid(
+        row=1, column=0, padx=10, pady=8, sticky="w")
     end_var = tk.StringVar(value=entry["end"] if entry else settings.get("default_end"))
-    ttk.Combobox(
-        dialog, textvariable=end_var, values=TIME_VALUES,
-        width=8, font=FONT, style="Dark.TCombobox", state="readonly",
-    ).grid(row=1, column=1, padx=10, pady=8)
+    dark_combo(dialog, end_var, TIME_VALUES).grid(row=1, column=1, padx=10, pady=8)
 
-    tk.Label(
-        dialog, text="Pause (Min):", font=FONT, bg=BG, fg=TEXT,
-    ).grid(row=2, column=0, padx=10, pady=8, sticky="w")
+    tk.Label(dialog, text="Pause (Min):", font=FONT, bg=BG, fg=TEXT).grid(
+        row=2, column=0, padx=10, pady=8, sticky="w")
 
     default_pause = settings.get("default_pause")
     if entry and "pause" in entry:
@@ -54,10 +43,7 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change):
     else:
         current_pause = str(default_pause) if not entry else "0"
     pause_var = tk.StringVar(value=current_pause)
-    ttk.Combobox(
-        dialog, textvariable=pause_var, values=PAUSE_VALUES,
-        width=8, font=FONT, style="Dark.TCombobox", state="readonly",
-    ).grid(row=2, column=1, padx=10, pady=8)
+    dark_combo(dialog, pause_var, PAUSE_VALUES).grid(row=2, column=1, padx=10, pady=8)
 
     def save():
         ok, msg = validate_entry(start_var.get(), end_var.get(), pause_minutes=int(pause_var.get()))
@@ -76,16 +62,5 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change):
     btn_frame = tk.Frame(dialog, bg=BG)
     btn_frame.grid(row=3, column=0, columnspan=2, pady=12)
 
-    tk.Button(
-        btn_frame, text="Speichern", command=save, font=FONT_BOLD,
-        bg=ACCENT, fg="#ffffff",
-        activebackground=ACCENT_HOVER, activeforeground="#ffffff",
-        relief=tk.FLAT, padx=16, pady=4, cursor="hand2",
-    ).pack(side=tk.LEFT, padx=5)
-
-    tk.Button(
-        btn_frame, text="Löschen", command=delete, font=FONT,
-        bg=CELL_BG, fg=TEXT,
-        activebackground=ENTRY_BG, activeforeground=TEXT,
-        relief=tk.FLAT, padx=16, pady=4, cursor="hand2",
-    ).pack(side=tk.LEFT, padx=5)
+    primary_button(btn_frame, "Speichern", save).pack(side=tk.LEFT, padx=5)
+    secondary_button(btn_frame, "Löschen", delete).pack(side=tk.LEFT, padx=5)

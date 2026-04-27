@@ -1,3 +1,4 @@
+import tkinter as tk
 from tkinter import ttk
 
 # Dark Modern color palette
@@ -51,3 +52,90 @@ def apply_combobox_style(dialog):
     dialog.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
     dialog.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
     dialog.option_add("*TCombobox*Listbox.font", FONT)
+
+
+def dark_entry(parent, textvariable, width=25, **kw):
+    return tk.Entry(
+        parent, textvariable=textvariable, width=width, font=FONT,
+        bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+        relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+        highlightcolor=ACCENT, highlightthickness=1, **kw,
+    )
+
+
+def dark_combo(parent, textvariable, values, width=8, **kw):
+    return ttk.Combobox(
+        parent, textvariable=textvariable, values=values,
+        width=width, font=FONT, style="Dark.TCombobox", state="readonly", **kw,
+    )
+
+
+def dark_text(parent, width, height, **kw):
+    return tk.Text(
+        parent, width=width, height=height, font=FONT,
+        bg=CELL_BG, fg=TEXT, insertbackground=ACCENT,
+        relief=tk.FLAT, highlightbackground=TEXT_MUTED,
+        highlightcolor=ACCENT, highlightthickness=1, wrap=tk.WORD, **kw,
+    )
+
+
+def primary_button(parent, text, command, **kw):
+    kw.setdefault("font", FONT_BOLD)
+    kw.setdefault("padx", 16)
+    kw.setdefault("pady", 4)
+    return tk.Button(
+        parent, text=text, command=command,
+        bg=ACCENT, fg="#ffffff",
+        activebackground=ACCENT_HOVER, activeforeground="#ffffff",
+        relief=tk.FLAT, cursor="hand2", **kw,
+    )
+
+
+def secondary_button(parent, text, command, **kw):
+    kw.setdefault("font", FONT)
+    kw.setdefault("padx", 16)
+    kw.setdefault("pady", 4)
+    return tk.Button(
+        parent, text=text, command=command,
+        bg=CELL_BG, fg=TEXT,
+        activebackground=ENTRY_BG, activeforeground=TEXT,
+        relief=tk.FLAT, cursor="hand2", **kw,
+    )
+
+
+def toggle_button(parent, text, command, active=False, **kw):
+    """Two-state segmented button used for the Monat/Woche switcher.
+
+    Re-style with set_toggle_active(btn, bool) when state changes.
+    """
+    btn = tk.Button(
+        parent, text=text, command=command,
+        font=FONT_SMALL, width=6, relief=tk.FLAT, cursor="hand2", **kw,
+    )
+    set_toggle_active(btn, active)
+    return btn
+
+
+def set_toggle_active(btn, active):
+    if active:
+        btn.config(
+            bg=ACCENT, fg="#ffffff",
+            activebackground=ACCENT, activeforeground="#ffffff",
+        )
+    else:
+        btn.config(
+            bg=CELL_BG, fg=TEXT_MUTED,
+            activebackground=ENTRY_BG, activeforeground=TEXT,
+        )
+
+
+def icon_button(parent, text, command, fg=ACCENT, hover_fg=None, **kw):
+    """Compact icon-style button used in the header (‹ › ⚙)."""
+    if hover_fg is None:
+        hover_fg = fg
+    return tk.Button(
+        parent, text=text, command=command, width=3,
+        font=FONT_BOLD, bg=CELL_BG, fg=fg,
+        activebackground=ENTRY_BG, activeforeground=hover_fg,
+        relief=tk.FLAT, cursor="hand2", **kw,
+    )

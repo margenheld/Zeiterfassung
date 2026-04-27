@@ -3,14 +3,14 @@ import datetime
 import os
 import tkinter as tk
 import traceback
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 
 from src.mail import get_gmail_service, send_email
 from src.platform_open import open_folder
 from src.report import generate_pdf, generate_report
 from src.theme import (
-    ACCENT, ACCENT_HOVER, BG, CELL_BG, ENTRY_BG, FONT, FONT_BOLD,
-    TEXT, apply_combobox_style,
+    BG, FONT, TEXT,
+    apply_combobox_style, dark_combo, primary_button, secondary_button,
 )
 
 
@@ -48,19 +48,8 @@ def show_missing_credentials_dialog(parent, base_path):
     btn_frame = tk.Frame(dialog, bg=BG)
     btn_frame.grid(row=1, column=0, columnspan=2, pady=(0, 16))
 
-    tk.Button(
-        btn_frame, text="Datenordner öffnen", command=open_and_close,
-        font=FONT_BOLD, bg=ACCENT, fg="#ffffff",
-        activebackground=ACCENT_HOVER, activeforeground="#ffffff",
-        relief=tk.FLAT, padx=16, pady=4, cursor="hand2",
-    ).pack(side=tk.LEFT, padx=5)
-
-    tk.Button(
-        btn_frame, text="OK", command=dialog.destroy,
-        font=FONT, bg=CELL_BG, fg=TEXT,
-        activebackground=ENTRY_BG, activeforeground=TEXT,
-        relief=tk.FLAT, padx=16, pady=4, cursor="hand2",
-    ).pack(side=tk.LEFT, padx=5)
+    primary_button(btn_frame, "Datenordner öffnen", open_and_close).pack(side=tk.LEFT, padx=5)
+    secondary_button(btn_frame, "OK", dialog.destroy).pack(side=tk.LEFT, padx=5)
 
 
 def _default_from_date(today):
@@ -112,30 +101,24 @@ def open_send_dialog(parent, storage, settings, base_path):
         if int(day_var.get()) > max_day:
             day_var.set(str(max_day))
 
-    def make_combo(textvariable, values, width):
-        return ttk.Combobox(
-            dialog, textvariable=textvariable, values=values,
-            width=width, font=FONT, style="Dark.TCombobox", state="readonly",
-        )
-
     def build_date_row(row, label_text, default_date):
         tk.Label(dialog, text=label_text, font=FONT, bg=BG, fg=TEXT).grid(
             row=row, column=0, padx=(10, 5), pady=8, sticky="w")
 
         day_var = tk.StringVar(value=str(default_date.day))
         max_day = calendar.monthrange(default_date.year, default_date.month)[1]
-        day_cb = make_combo(day_var, [str(d) for d in range(1, max_day + 1)], 3)
+        day_cb = dark_combo(dialog, day_var, [str(d) for d in range(1, max_day + 1)], width=3)
         day_cb.grid(row=row, column=1, padx=2, pady=8)
 
         tk.Label(dialog, text=".", font=FONT, bg=BG, fg=TEXT).grid(row=row, column=2)
 
         month_var = tk.StringVar(value=str(default_date.month))
-        make_combo(month_var, month_values, 3).grid(row=row, column=3, padx=2, pady=8)
+        dark_combo(dialog, month_var, month_values, width=3).grid(row=row, column=3, padx=2, pady=8)
 
         tk.Label(dialog, text=".", font=FONT, bg=BG, fg=TEXT).grid(row=row, column=4)
 
         year_var = tk.StringVar(value=str(default_date.year))
-        make_combo(year_var, year_values, 5).grid(row=row, column=5, padx=(2, 10), pady=8)
+        dark_combo(dialog, year_var, year_values, width=5).grid(row=row, column=5, padx=(2, 10), pady=8)
 
         month_var.trace_add("write", lambda *_: update_day_values(day_cb, day_var, month_var, year_var))
         year_var.trace_add("write", lambda *_: update_day_values(day_cb, day_var, month_var, year_var))
@@ -209,16 +192,5 @@ def open_send_dialog(parent, storage, settings, base_path):
     btn_frame = tk.Frame(dialog, bg=BG)
     btn_frame.grid(row=2, column=0, columnspan=6, pady=12)
 
-    tk.Button(
-        btn_frame, text="Senden", command=do_send, font=FONT_BOLD,
-        bg=ACCENT, fg="#ffffff",
-        activebackground=ACCENT_HOVER, activeforeground="#ffffff",
-        relief=tk.FLAT, padx=16, pady=4, cursor="hand2",
-    ).pack(side=tk.LEFT, padx=5)
-
-    tk.Button(
-        btn_frame, text="Abbrechen", command=dialog.destroy, font=FONT,
-        bg=CELL_BG, fg=TEXT,
-        activebackground=ENTRY_BG, activeforeground=TEXT,
-        relief=tk.FLAT, padx=16, pady=4, cursor="hand2",
-    ).pack(side=tk.LEFT, padx=5)
+    primary_button(btn_frame, "Senden", do_send).pack(side=tk.LEFT, padx=5)
+    secondary_button(btn_frame, "Abbrechen", dialog.destroy).pack(side=tk.LEFT, padx=5)

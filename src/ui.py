@@ -18,8 +18,9 @@ from src.dialogs.settings_dialog import open_settings_dialog
 from src.theme import (
     BG, CELL_BG, WEEKEND_BG, ACCENT, TEXT, TEXT_MUTED,
     ENTRY_BG, WEEKEND_ENTRY_BG, WEEKEND_FG,
-    FONT, FONT_SMALL, FONT_BOLD, FONT_HEADER, FONT_FOOTER,
+    FONT, FONT_BOLD, FONT_HEADER, FONT_FOOTER, FONT_SMALL,
     CELL_BG_HOVER, WEEKEND_BG_HOVER, ENTRY_BG_HOVER, WEEKEND_ENTRY_BG_HOVER,
+    icon_button, secondary_button, set_toggle_active, toggle_button,
 )
 
 DAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
@@ -103,51 +104,32 @@ class App:
         frame = tk.Frame(self.root, bg=BG)
         frame.pack(fill=tk.X, padx=10, pady=(10, 0))
 
-        tk.Button(
-            frame, text="‹", command=self._prev, width=3,
-            font=FONT_BOLD, bg=CELL_BG, fg=ACCENT,
-            activebackground=ENTRY_BG, activeforeground=ACCENT,
-            relief=tk.FLAT, cursor="hand2"
-        ).pack(side=tk.LEFT)
+        icon_button(frame, "\u2039", self._prev).pack(side=tk.LEFT)
 
-        # Toggle switch frame
         toggle_frame = tk.Frame(frame, bg=BG)
         toggle_frame.pack(side=tk.LEFT, padx=10)
 
-        self.btn_month = tk.Button(
-            toggle_frame, text="Monat", command=lambda: self._set_view("month"),
-            font=FONT_SMALL, width=6, relief=tk.FLAT, cursor="hand2",
-            bg=ACCENT, fg="#ffffff",
-            activebackground=ACCENT, activeforeground="#ffffff"
+        self.btn_month = toggle_button(
+            toggle_frame, "Monat", lambda: self._set_view("month"), active=True,
         )
         self.btn_month.pack(side=tk.LEFT, padx=(0, 1))
 
-        self.btn_week = tk.Button(
-            toggle_frame, text="Woche", command=lambda: self._set_view("week"),
-            font=FONT_SMALL, width=6, relief=tk.FLAT, cursor="hand2",
-            bg=CELL_BG, fg=TEXT_MUTED,
-            activebackground=ENTRY_BG, activeforeground=TEXT
+        self.btn_week = toggle_button(
+            toggle_frame, "Woche", lambda: self._set_view("week"), active=False,
         )
         self.btn_week.pack(side=tk.LEFT)
 
         self.header_label = tk.Label(
-            frame, text="", font=FONT_HEADER, bg=BG, fg="#ffffff"
+            frame, text="", font=FONT_HEADER, bg=BG, fg="#ffffff",
         )
         self.header_label.pack(side=tk.LEFT, expand=True)
 
-        tk.Button(
-            frame, text="⚙", command=self._open_settings, width=3,
-            font=FONT_BOLD, bg=CELL_BG, fg=TEXT_MUTED,
-            activebackground=ENTRY_BG, activeforeground=TEXT,
-            relief=tk.FLAT, cursor="hand2"
+        icon_button(
+            frame, "\u2699", self._open_settings,
+            fg=TEXT_MUTED, hover_fg=TEXT,
         ).pack(side=tk.RIGHT)
 
-        tk.Button(
-            frame, text="›", command=self._next, width=3,
-            font=FONT_BOLD, bg=CELL_BG, fg=ACCENT,
-            activebackground=ENTRY_BG, activeforeground=ACCENT,
-            relief=tk.FLAT, cursor="hand2"
-        ).pack(side=tk.RIGHT, padx=(0, 5))
+        icon_button(frame, "\u203a", self._next).pack(side=tk.RIGHT, padx=(0, 5))
 
     def _build_grid(self):
         self.grid_frame = tk.Frame(self.root, bg=BG)
@@ -163,11 +145,8 @@ class App:
         )
         self.footer_label.pack(side=tk.LEFT, expand=True)
 
-        tk.Button(
-            footer_frame, text="Monat senden", command=self._send,
-            font=FONT, bg=CELL_BG, fg=TEXT,
-            activebackground=ENTRY_BG, activeforeground=TEXT,
-            relief=tk.FLAT, padx=12, pady=4, cursor="hand2"
+        secondary_button(
+            footer_frame, "Monat senden", self._send, padx=12,
         ).pack(side=tk.RIGHT)
 
     def _prev(self):
@@ -216,12 +195,8 @@ class App:
         self._refresh()
 
     def _update_toggle_style(self):
-        if self.view_mode == "month":
-            self.btn_month.config(bg=ACCENT, fg="#ffffff", activebackground=ACCENT, activeforeground="#ffffff")
-            self.btn_week.config(bg=CELL_BG, fg=TEXT_MUTED, activebackground=ENTRY_BG, activeforeground=TEXT)
-        else:
-            self.btn_week.config(bg=ACCENT, fg="#ffffff", activebackground=ACCENT, activeforeground="#ffffff")
-            self.btn_month.config(bg=CELL_BG, fg=TEXT_MUTED, activebackground=ENTRY_BG, activeforeground=TEXT)
+        set_toggle_active(self.btn_month, self.view_mode == "month")
+        set_toggle_active(self.btn_week, self.view_mode == "week")
 
     def _open_settings(self):
         open_settings_dialog(
