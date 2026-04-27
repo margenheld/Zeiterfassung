@@ -1,0 +1,189 @@
+import os
+import tkinter as tk
+import traceback
+from tkinter import messagebox
+
+from src.autostart import disable_autostart, enable_autostart, resolve_autostart_target
+from src.platform_open import open_folder
+from src.theme import (
+    ACCENT, BG, CELL_BG, FONT, FONT_BOLD, FONT_SMALL,
+    PAUSE_VALUES, STATUS_OK, TEXT, TEXT_MUTED, TIME_VALUES,
+    apply_combobox_style, dark_combo, dark_entry, dark_text,
+    primary_button, secondary_button,
+)
+from src.time_utils import validate_entry
+
+
+def open_settings_dialog(parent, settings, base_path, on_change):
+    """Modal dialog for editing app settings.
+
+    on_change is called after a successful save so the calendar can refresh.
+    """
+    dialog = tk.Toplevel(parent)
+    dialog.title("Einstellungen")
+    dialog.resizable(False, False)
+    dialog.grab_set()
+    dialog.configure(bg=BG)
+
+    apply_combobox_style(dialog)
+
+    creds_path = os.path.join(base_path, "credentials.json")
+
+    def label(text, row, col=0, **grid_kw):
+        kw = dict(padx=10, pady=8, sticky="w")
+        kw.update(grid_kw)
+        tk.Label(dialog, text=text, font=FONT, bg=BG, fg=TEXT).grid(row=row, column=col, **kw)
+
+    tk.Label(
+        dialog, text="— Gmail-Zugangsdaten —", font=FONT_BOLD,
+        bg=BG, fg=TEXT_MUTED,
+    ).grid(row=0, column=0, columnspan=2, padx=10, pady=(8, 4))
+
+    label("Datenordner:", row=1, pady=4)
+
+    creds_row = tk.Frame(dialog, bg=BG)
+    creds_row.grid(row=1, column=1, padx=10, pady=4, sticky="w")
+
+    def open_data_folder():
+        try:
+            open_folder(base_path)
+        except Exception as e:
+            messagebox.showerror(
+                "Ordner konnte nicht geöffnet werden",
+                f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}",
+                parent=dialog,
+            )
+
+    secondary_button(creds_row, "Ordner öffnen", open_data_folder, padx=12, pady=2).pack(side=tk.LEFT)
+
+    status_label = tk.Label(creds_row, text="", font=FONT_SMALL, bg=BG)
+    status_label.pack(side=tk.LEFT, padx=(10, 0))
+
+    def refresh_status():
+        if not status_label.winfo_exists():
+            return
+        if os.path.exists(creds_path):
+            status_label.config(text="✓ credentials.json vorhanden", fg=STATUS_OK)
+        else:
+            status_label.config(text="✗ credentials.json fehlt", fg=ACCENT)
+        dialog.after(500, refresh_status)
+
+    refresh_status()
+
+    label("Absender:", row=2)
+    email_var = tk.StringVar(value=settings.get("email"))
+    dark_entry(dialog, email_var, width=25).grid(row=2, column=1, padx=10, pady=8)
+
+    label("Standard-Start:", row=3)
+    start_var = tk.StringVar(value=settings.get("default_start"))
+    dark_combo(dialog, start_var, TIME_VALUES).grid(row=3, column=1, padx=10, pady=8)
+
+    label("Standard-Ende:", row=4)
+    end_var = tk.StringVar(value=settings.get("default_end"))
+    dark_combo(dialog, end_var, TIME_VALUES).grid(row=4, column=1, padx=10, pady=8)
+
+    label("Standard-Pause (Min):", row=5)
+    pause_var = tk.StringVar(value=str(settings.get("default_pause")))
+    dark_combo(dialog, pause_var, PAUSE_VALUES).grid(row=5, column=1, padx=10, pady=8)
+
+    label("Empfänger:", row=6)
+    recipient_var = tk.StringVar(value=settings.get("recipient"))
+    dark_entry(dialog, recipient_var, width=25).grid(row=6, column=1, padx=10, pady=8)
+
+    label("Name:", row=7)
+    name_var = tk.StringVar(value=settings.get("name"))
+    dark_entry(dialog, name_var, width=25).grid(row=7, column=1, padx=10, pady=8)
+
+    label("Stundenlohn (€):", row=8)
+    rate_var = tk.StringVar(value=str(settings.get("hourly_rate") or ""))
+    dark_entry(dialog, rate_var, width=10).grid(row=8, column=1, padx=10, pady=8, sticky="w")
+
+    tk.Label(
+        dialog, text="(optional – nur für dich sichtbar)", font=FONT_SMALL,
+        bg=BG, fg=TEXT_MUTED,
+    ).grid(row=8, column=1, padx=(120, 10), pady=8, sticky="w")
+
+    tk.Label(
+        dialog, text="— Mail-Vorlage —", font=FONT_BOLD, bg=BG, fg=TEXT_MUTED,
+    ).grid(row=9, column=0, columnspan=2, padx=10, pady=(16, 4))
+
+    label("Betreff:", row=10, pady=4)
+    subject_var = tk.StringVar(value=settings.get("mail_subject"))
+    dark_entry(dialog, subject_var, width=35).grid(row=10, column=1, padx=10, pady=4)
+
+    label("Anrede:", row=11, pady=4)
+    greeting_var = tk.StringVar(value=settings.get("mail_greeting"))
+    dark_entry(dialog, greeting_var, width=35).grid(row=11, column=1, padx=10, pady=4)
+
+    label("Inhalt:", row=12, pady=4, sticky="nw")
+    content_text = dark_text(dialog, 35, 3)
+    content_text.grid(row=12, column=1, padx=10, pady=4)
+    content_text.insert("1.0", settings.get("mail_content"))
+
+    label("Gruß:", row=13, pady=4, sticky="nw")
+    closing_text = dark_text(dialog, 35, 2)
+    closing_text.grid(row=13, column=1, padx=10, pady=4)
+    closing_text.insert("1.0", settings.get("mail_closing"))
+
+    tk.Label(
+        dialog, text="Platzhalter: {zeitraum}, {gesamt}", font=("Segoe UI", 8),
+        bg=BG, fg=TEXT_MUTED,
+    ).grid(row=14, column=0, columnspan=2, padx=10, pady=(0, 4))
+
+    autostart_var = tk.BooleanVar(value=settings.get("autostart"))
+    tk.Checkbutton(
+        dialog, text="Autostart (minimiert bei Anmeldung)",
+        variable=autostart_var, font=FONT,
+        bg=BG, fg=TEXT, selectcolor=CELL_BG,
+        activebackground=BG, activeforeground=TEXT,
+        cursor="hand2",
+    ).grid(row=15, column=0, columnspan=2, padx=10, pady=8, sticky="w")
+
+    def save_settings():
+        ok, msg = validate_entry(start_var.get(), end_var.get())
+        if not ok:
+            messagebox.showerror("Standard-Arbeitszeit ungültig", msg, parent=dialog)
+            return
+
+        new_autostart = autostart_var.get()
+        old_autostart = settings.get("autostart")
+
+        if new_autostart != old_autostart:
+            try:
+                if new_autostart:
+                    target, arguments = resolve_autostart_target(base_path)
+                    enable_autostart(target, arguments)
+                else:
+                    disable_autostart()
+                settings.set("autostart", new_autostart)
+            except Exception as e:
+                messagebox.showerror(
+                    "Autostart-Fehler",
+                    f"Autostart konnte nicht geändert werden:\n{e}",
+                    parent=dialog,
+                )
+                return
+
+        settings.set("email", email_var.get())
+        settings.set("default_start", start_var.get())
+        settings.set("default_end", end_var.get())
+        settings.set("default_pause", int(pause_var.get()))
+        settings.set("recipient", recipient_var.get())
+        settings.set("name", name_var.get())
+        settings.set("mail_subject", subject_var.get())
+        settings.set("mail_greeting", greeting_var.get())
+        settings.set("mail_content", content_text.get("1.0", "end-1c"))
+        settings.set("mail_closing", closing_text.get("1.0", "end-1c"))
+        rate_str = rate_var.get().strip()
+        try:
+            settings.set("hourly_rate", float(rate_str) if rate_str else 0.0)
+        except ValueError:
+            settings.set("hourly_rate", 0.0)
+        on_change()
+        dialog.destroy()
+
+    btn_frame = tk.Frame(dialog, bg=BG)
+    btn_frame.grid(row=16, column=0, columnspan=2, pady=12)
+
+    primary_button(btn_frame, "Speichern", save_settings).pack(side=tk.LEFT, padx=5)
+    secondary_button(btn_frame, "Abbrechen", dialog.destroy).pack(side=tk.LEFT, padx=5)
