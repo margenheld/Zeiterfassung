@@ -14,6 +14,7 @@ DEFAULTS = {
     "mail_content": "anbei erhalten Sie meine Zeiterfassung für den Zeitraum {zeitraum}.",
     "mail_closing": "Mit freundlichen Grüßen",
     "hourly_rate": 0.0,
+    "state": "",
 }
 
 class Settings:

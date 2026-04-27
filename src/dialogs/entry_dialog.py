@@ -1,6 +1,8 @@
+import datetime
 import tkinter as tk
 from tkinter import messagebox
 
+from src.holidays_de import get_holidays
 from src.theme import (
     BG, FONT, PAUSE_VALUES, TEXT, TIME_VALUES,
     apply_combobox_style, dark_combo, primary_button, secondary_button,
@@ -50,6 +52,24 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change):
         if not ok:
             messagebox.showerror("Fehler", msg, parent=dialog)
             return
+
+        # Feiertags-Warnung nur beim Anlegen, nicht beim Edit (entry is None)
+        if entry is None:
+            state = settings.get("state")
+            if state:
+                day = datetime.date.fromisoformat(date_str)
+                feiertage = get_holidays(state, day.year)
+                if day in feiertage:
+                    date_de = day.strftime("%d.%m.%Y")
+                    confirm = messagebox.askyesno(
+                        "Feiertag",
+                        f"Der {date_de} ist {feiertage[day]} (Feiertag).\n\n"
+                        "Trotzdem Eintrag anlegen?",
+                        parent=dialog,
+                    )
+                    if not confirm:
+                        return
+
         storage.save(date_str, start_var.get(), end_var.get(), pause=int(pause_var.get()))
         dialog.destroy()
         on_change()

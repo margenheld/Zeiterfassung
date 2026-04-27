@@ -37,7 +37,7 @@ Alternative: `src/version.py` auf die nächste Patch-Version bumpen und einen ne
 python build.py
 ```
 
-`build.py` ist ein Plattform-Dispatcher und ruft PyInstaller je nach `platform.system()` unterschiedlich auf. Auf allen drei Plattformen sind `--collect-all xhtml2pdf --collect-all reportlab` zwingend — ohne sie schlägt die PDF-Erzeugung im gebauten Artefakt stumm fehl.
+`build.py` ist ein Plattform-Dispatcher und ruft PyInstaller je nach `platform.system()` unterschiedlich auf. Auf allen drei Plattformen sind `--collect-all xhtml2pdf --collect-all reportlab --collect-all holidays` zwingend — ohne sie schlagen PDF-Erzeugung bzw. Feiertags-Lookup im gebauten Artefakt stumm fehl.
 
 ## Cross-Platform Builds
 
@@ -76,7 +76,7 @@ Damit Umlaute/ß nicht als Mojibake ankommen, gelten drei Pflichten:
 
 ## Tests / CI
 
-`.github/workflows/test.yml` installiert **nur** `pytest`, nicht `requirements.txt`. Grund: `pycairo` (transitive Dep von `xhtml2pdf`) braucht Cairo-Systemheader auf Ubuntu und bricht sonst den CI-Build. Der Import von `xhtml2pdf` in `src/report.py::generate_pdf` ist lazy, daher laufen die Report-Tests ohne die Lib.
+`.github/workflows/test.yml` installiert gezielt nur die Pakete, die die Tests brauchen (`pytest`, `holidays`), **nicht** `requirements.txt`. Grund: `pycairo` (transitive Dep von `xhtml2pdf`) braucht Cairo-Systemheader auf Ubuntu und bricht sonst den CI-Build. Der Import von `xhtml2pdf` in `src/report.py::generate_pdf` ist lazy, daher laufen die Report-Tests ohne die Lib. `holidays` ist pure Python ohne C-Deps und problemlos installierbar.
 
 Lokal: `pytest` aus dem Repo-Root. Alle Tests müssen vor dem PR-Merge grün sein.
 

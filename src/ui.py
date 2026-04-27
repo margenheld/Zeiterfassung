@@ -9,6 +9,8 @@ import platform
 import threading
 import traceback
 from src.time_utils import calculate_hours, get_week_dates, get_week_label, week_spans_months
+from src.holidays_de import get_holidays
+from src.tooltip import attach_tooltip
 from src.mail import refresh_token_if_needed, TokenAuthError, TokenNetworkError
 from src.version import VERSION
 
@@ -18,6 +20,7 @@ from src.dialogs.settings_dialog import open_settings_dialog
 from src.theme import (
     BG, CELL_BG, WEEKEND_BG, ACCENT, TEXT, TEXT_MUTED,
     ENTRY_BG, WEEKEND_ENTRY_BG, WEEKEND_FG,
+    HOLIDAY_BG, HOLIDAY_BG_HOVER, HOLIDAY_ACCENT,
     FONT, FONT_BOLD, FONT_HEADER, FONT_FOOTER, FONT_SMALL,
     CELL_BG_HOVER, WEEKEND_BG_HOVER, ENTRY_BG_HOVER, WEEKEND_ENTRY_BG_HOVER,
     icon_button, secondary_button, set_toggle_active, toggle_button,
@@ -235,6 +238,9 @@ class App:
         entries = self.storage.get_all()
         total_hours = 0.0
 
+        state = self.settings.get("state")
+        holidays_map = get_holidays(state, self.year) if state else {}
+
         for row, week in enumerate(cal.monthdayscalendar(self.year, self.month), start=1):
             for col, day in enumerate(week):
                 if day == 0:
@@ -247,6 +253,7 @@ class App:
                 date_str = f"{self.year}-{self.month:02d}-{day:02d}"
                 entry = entries.get(date_str)
                 is_weekend = col >= 5
+                day_date = datetime.date(self.year, self.month, day)
 
                 text = str(day)
                 fg = TEXT
@@ -279,6 +286,17 @@ class App:
                         w.bind("<Button-3>", lambda e, d=date_str: self._delete_entry(d))
                         w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
                         w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
+                    if day_date in holidays_map:
+                        for w in (cell, day_lbl, time_lbl):
+                            attach_tooltip(w, f"Feiertag: {holidays_map[day_date]}")
+                elif day_date in holidays_map:
+                    cell = self._build_holiday_cell(
+                        new_frame,
+                        day_text=str(day),
+                        name=holidays_map[day_date],
+                        max_name_len=12,
+                        on_click=lambda d=date_str: self._open_dialog(d),
+                    )
                 else:
                     bg = WEEKEND_BG if is_weekend else CELL_BG
                     hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
@@ -327,6 +345,19 @@ class App:
         entries = self.storage.get_all()
         total_hours = 0.0
         spans = week_spans_months(self.iso_year, self.current_week)
+        state = self.settings.get("state")
+        holidays_map: dict[datetime.date, str] = {}
+        if state:
+            for y in {dates[0].year, dates[-1].year}:
+                holidays_map.update(get_holidays(state, y))
+
+        # Probe-Label, um die natürliche Pixel-Größe einer Standard-Wochenzelle
+        # zu ermitteln. Holiday-Zellen werden auf diese Größe fixiert, damit
+        # längere Feiertagsnamen die Spalte nicht aufweiten.
+        probe = tk.Label(new_frame, text="", font=FONT, width=8, height=5)
+        probe.update_idletasks()
+        cell_size = (probe.winfo_reqwidth(), probe.winfo_reqheight())
+        probe.destroy()
 
         for col, day_date in enumerate(dates):
             date_str = day_date.isoformat()
@@ -364,6 +395,18 @@ class App:
                     w.bind("<Button-3>", lambda e, d=date_str: self._delete_entry(d))
                     w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
                     w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
+                if day_date in holidays_map:
+                    for w in (cell, day_lbl, time_lbl):
+                        attach_tooltip(w, f"Feiertag: {holidays_map[day_date]}")
+            elif day_date in holidays_map:
+                cell = self._build_holiday_cell(
+                    new_frame,
+                    day_text=day_text,
+                    name=holidays_map[day_date],
+                    max_name_len=18,
+                    on_click=lambda d=date_str: self._open_dialog(d),
+                    cell_size=cell_size,
+                )
             else:
                 bg = WEEKEND_BG if is_weekend else CELL_BG
                 hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
@@ -396,6 +439,53 @@ class App:
             )
         else:
             self.footer_label.config(text=f"Gesamt: {round(total_hours, 2)}h")
+
+    @staticmethod
+    def _truncate(text: str, max_len: int) -> str:
+        if len(text) <= max_len:
+            return text
+        return text[: max_len - 1] + "…"
+
+    def _build_holiday_cell(self, parent, day_text, name, max_name_len, on_click, cell_size=None):
+        """Grüne Feiertagszelle. Layout analog zur Eintragszelle.
+
+        cell_size: optional (width_px, height_px). Wenn gesetzt, wird der Frame
+        auf diese Pixel-Größe fixiert (verhindert Aufweitung der Spalte durch
+        längere Namen — relevant für die Wochenansicht).
+        """
+        cell = tk.Frame(
+            parent, bg=HOLIDAY_BG, relief=tk.SOLID,
+            highlightbackground=HOLIDAY_ACCENT, highlightthickness=1,
+            cursor="hand2",
+        )
+        if cell_size is not None:
+            cell.config(width=cell_size[0], height=cell_size[1])
+            cell.pack_propagate(False)
+        day_lbl = tk.Label(
+            cell, text=day_text, font=FONT,
+            bg=HOLIDAY_BG, fg=TEXT, cursor="hand2",
+        )
+        day_lbl.pack(pady=(4, 0))
+        truncated = self._truncate(name, max_name_len)
+        name_lbl = tk.Label(
+            cell, text=truncated,
+            font=FONT_SMALL, bg=HOLIDAY_BG, fg=TEXT_MUTED, cursor="hand2",
+        )
+        if cell_size is not None:
+            # Pixel-fixierte Zelle: Text bei Bedarf umbrechen, nicht horizontal überstehen.
+            name_lbl.config(wraplength=cell_size[0] - 6, justify="center")
+        name_lbl.pack(pady=(0, 4))
+
+        is_truncated = truncated != name
+        for w in (cell, day_lbl, name_lbl):
+            w.bind("<Button-1>", lambda e: on_click())
+            w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, nl=name_lbl:
+                self._cell_hover(c, dl, nl, HOLIDAY_BG_HOVER))
+            w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, nl=name_lbl:
+                self._cell_hover(c, dl, nl, HOLIDAY_BG))
+            if is_truncated:
+                attach_tooltip(w, name)
+        return cell
 
     @staticmethod
     def _cell_hover(frame, day_lbl, time_lbl, bg):
