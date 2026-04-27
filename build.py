@@ -20,6 +20,7 @@ def _pyinstaller_common(extra_args):
         "--add-data", add_data,
         "--collect-all", "xhtml2pdf",
         "--collect-all", "reportlab",
+        "--collect-all", "holidays",
         *extra_args,
         "src/main.py",
     ]
