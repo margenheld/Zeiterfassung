@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.9.1
+- Multi-Monitor-Fix: Settings-, Eintrags-, Sende- und Credentials-Dialoge öffnen sich jetzt zuverlässig auf demselben Monitor wie das Hauptfenster (vorher landeten sie immer auf dem Primärmonitor). Wenn der Dialog grösser ist als das App-Fenster, wird er an Parent-Top-Left ausgerichtet, damit die Titlebar nicht über den Bildschirmrand rutscht
+- `settings.json` wird jetzt atomar geschrieben (temp + replace), damit ein Crash mid-write keine korrupte Datei hinterlassen kann — relevant, weil Settings-Dialog und Update-Banner-Worker parallel schreiben können
+- Internes Refactoring: Monats-/Wochenansicht in `ui.py` und HTML-/PDF-Render in `report.py` deduplizieren gemeinsame Render-Helfer
+
 ## v1.9.0
 - Update-Check beim App-Start: einmal pro Kalendertag wird die GitHub-Releases-API abgefragt. Liegt eine neuere Version vor, erscheint zwischen Header und Kalender ein Banner mit dem Versions-Hinweis und einem **Download**-Button, der direkt das passende Plattform-Asset (`.exe` / `.dmg` / `.AppImage`) im Browser öffnet
 - Fallback auf die Release-Page, falls kein Plattform-Asset gefunden wird (z.B. Intel-Mac oder ARM-Linux)
