@@ -1,3 +1,4 @@
+import logging
 import os
 import tkinter as tk
 import traceback
@@ -50,6 +51,7 @@ def open_settings_dialog(parent, settings, base_path, on_change):
         try:
             open_folder(base_path)
         except Exception as e:
+            logging.getLogger(__name__).exception("Datenordner konnte nicht geöffnet werden")
             messagebox.showerror(
                 "Ordner konnte nicht geöffnet werden",
                 f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}",
