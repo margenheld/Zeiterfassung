@@ -9,7 +9,10 @@ import platform
 import threading
 import traceback
 import webbrowser
-from src.time_utils import calculate_hours, get_week_dates, get_week_label, week_spans_months
+from src.time_utils import (
+    DAYS_DE, MONTHS_DE,
+    calculate_hours, get_week_dates, get_week_label, week_spans_months,
+)
 from src.holidays_de import get_holidays
 from src.tooltip import attach_tooltip
 from src.mail import refresh_token_if_needed, TokenAuthError, TokenNetworkError
@@ -34,13 +37,6 @@ from src.theme import (
     CELL_BG_HOVER, WEEKEND_BG_HOVER, ENTRY_BG_HOVER, WEEKEND_ENTRY_BG_HOVER,
     icon_button, secondary_button, set_toggle_active, toggle_button,
 )
-
-DAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
-MONTHS_DE = [
-    "", "Januar", "Februar", "März", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember"
-]
-
 
 class App:
     def __init__(self, root, storage, settings, base_path="."):
@@ -319,20 +315,105 @@ class App:
         self.root.update_idletasks()
         self.root.geometry("")
 
+    def _build_grid_header(self, parent):
+        for col, day_name in enumerate(DAYS_DE):
+            fg = TEXT_MUTED if col < 5 else WEEKEND_FG
+            tk.Label(
+                parent, text=day_name, font=FONT_BOLD, bg=BG, fg=fg,
+            ).grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
+
+    def _build_entry_cell(self, parent, date_str, day_text, entry, is_weekend, pad):
+        bg = WEEKEND_ENTRY_BG if is_weekend else ENTRY_BG
+        hover_bg = WEEKEND_ENTRY_BG_HOVER if is_weekend else ENTRY_BG_HOVER
+        cell = tk.Frame(
+            parent, bg=bg, relief=tk.SOLID,
+            highlightbackground=ACCENT, highlightthickness=1, cursor="hand2",
+        )
+        day_lbl = tk.Label(
+            cell, text=day_text, font=FONT,
+            bg=bg, fg=TEXT, cursor="hand2",
+        )
+        day_lbl.pack(pady=(pad, 0))
+        time_lbl = tk.Label(
+            cell, text=f"{entry['start']}-{entry['end']}",
+            font=FONT_SMALL, bg=bg, fg=TEXT_MUTED, cursor="hand2",
+        )
+        time_lbl.pack(pady=(0, pad))
+        for w in (cell, day_lbl, time_lbl):
+            w.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
+            w.bind("<Button-3>", lambda e, d=date_str: self._delete_entry(d))
+            w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
+            w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
+        return cell
+
+    def _build_empty_cell(self, parent, date_str, day_text, is_weekend, height):
+        bg = WEEKEND_BG if is_weekend else CELL_BG
+        hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
+        fg = WEEKEND_FG if is_weekend else TEXT
+        cell = tk.Label(
+            parent, text=day_text, font=FONT,
+            bg=bg, fg=fg, relief=tk.FLAT,
+            width=8, height=height, cursor="hand2",
+        )
+        cell.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
+        cell.bind("<Enter>", lambda e, c=cell, hb=hover_bg: c.config(bg=hb))
+        cell.bind("<Leave>", lambda e, c=cell, ob=bg: c.config(bg=ob))
+        return cell
+
+    def _build_day_cell(self, parent, date_str, day_text, day_date, is_weekend,
+                        entry, holidays_map, pad, empty_height,
+                        holiday_max_len, holiday_cell_size=None):
+        """Dispatcht auf Entry-, Holiday- oder Empty-Zelle und liefert die fertig
+        konfigurierte Widget-Instanz. Caller grided das Ergebnis selbst."""
+        if entry:
+            cell = self._build_entry_cell(
+                parent, date_str, day_text, entry, is_weekend, pad,
+            )
+            if day_date in holidays_map:
+                attach_tooltip(cell, f"Feiertag: {holidays_map[day_date]}")
+            return cell
+        if day_date in holidays_map:
+            return self._build_holiday_cell(
+                parent, day_text=day_text,
+                name=holidays_map[day_date], max_name_len=holiday_max_len,
+                on_click=lambda d=date_str: self._open_dialog(d),
+                cell_size=holiday_cell_size,
+            )
+        return self._build_empty_cell(
+            parent, date_str, day_text, is_weekend, empty_height,
+        )
+
+    def _swap_grid(self, new_frame):
+        for col in range(7):
+            new_frame.columnconfigure(col, weight=1)
+        self.grid_frame.destroy()
+        self.grid_frame = new_frame
+        self.grid_frame.pack(
+            fill=tk.BOTH, expand=True, padx=10, pady=5,
+            before=self.footer_label.master,
+        )
+
+    def _update_footer(self, total_hours):
+        rate = self.settings.get("hourly_rate") or 0
+        total_rounded = round(total_hours, 2)
+        if rate > 0:
+            brutto = round(total_hours * rate, 2)
+            self.footer_label.config(
+                text=f"Gesamt: {total_rounded}h  —  {brutto:.2f} € brutto"
+            )
+        else:
+            self.footer_label.config(text=f"Gesamt: {total_rounded}h")
+
+    def _entry_hours(self, entry):
+        return calculate_hours(
+            entry["start"], entry["end"], pause_minutes=entry.get("pause", 0),
+        )
+
     def _refresh_month(self):
         # Build new grid off-screen, then swap to avoid flicker
         new_frame = tk.Frame(self.root, bg=BG)
+        self._build_grid_header(new_frame)
 
-        # Column headers
-        for col, day_name in enumerate(DAYS_DE):
-            fg = TEXT_MUTED if col < 5 else WEEKEND_FG
-            lbl = tk.Label(
-                new_frame, text=day_name, font=FONT_BOLD,
-                bg=BG, fg=fg
-            )
-            lbl.grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
-
-        # Calendar weeks
         cal = calendar.Calendar(firstweekday=0)
         entries = self.storage.get_all()
         total_hours = 0.0
@@ -343,101 +424,29 @@ class App:
         for row, week in enumerate(cal.monthdayscalendar(self.year, self.month), start=1):
             for col, day in enumerate(week):
                 if day == 0:
-                    lbl = tk.Label(
-                        new_frame, text="", bg=BG, relief=tk.FLAT
-                    )
-                    lbl.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
+                    tk.Label(new_frame, text="", bg=BG, relief=tk.FLAT).grid(
+                        row=row, column=col, sticky="nsew", padx=2, pady=2)
                     continue
 
                 date_str = f"{self.year}-{self.month:02d}-{day:02d}"
-                entry = entries.get(date_str)
-                is_weekend = col >= 5
                 day_date = datetime.date(self.year, self.month, day)
-
-                text = str(day)
-                fg = TEXT
-                if is_weekend and not entry:
-                    fg = WEEKEND_FG
-
+                entry = entries.get(date_str)
                 if entry:
-                    pause = entry.get("pause", 0)
-                    hours = calculate_hours(entry["start"], entry["end"], pause_minutes=pause)
-                    total_hours += hours
-                    bg = WEEKEND_ENTRY_BG if is_weekend else ENTRY_BG
-                    cell = tk.Frame(
-                        new_frame, bg=bg, relief=tk.SOLID,
-                        highlightbackground=ACCENT, highlightthickness=1,
-                        cursor="hand2"
-                    )
-                    day_lbl = tk.Label(
-                        cell, text=str(day), font=FONT,
-                        bg=bg, fg=TEXT, cursor="hand2"
-                    )
-                    day_lbl.pack(pady=(4, 0))
-                    time_lbl = tk.Label(
-                        cell, text=f"{entry['start']}-{entry['end']}",
-                        font=FONT_SMALL, bg=bg, fg=TEXT_MUTED, cursor="hand2"
-                    )
-                    time_lbl.pack(pady=(0, 4))
-                    hover_bg = WEEKEND_ENTRY_BG_HOVER if is_weekend else ENTRY_BG_HOVER
-                    for w in (cell, day_lbl, time_lbl):
-                        w.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
-                        w.bind("<Button-3>", lambda e, d=date_str: self._delete_entry(d))
-                        w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
-                        w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
-                    if day_date in holidays_map:
-                        attach_tooltip(cell, f"Feiertag: {holidays_map[day_date]}")
-                elif day_date in holidays_map:
-                    cell = self._build_holiday_cell(
-                        new_frame,
-                        day_text=str(day),
-                        name=holidays_map[day_date],
-                        max_name_len=12,
-                        on_click=lambda d=date_str: self._open_dialog(d),
-                    )
-                else:
-                    bg = WEEKEND_BG if is_weekend else CELL_BG
-                    hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
-                    cell = tk.Label(
-                        new_frame, text=text, font=FONT,
-                        bg=bg, fg=fg, relief=tk.FLAT,
-                        width=8, height=3, cursor="hand2"
-                    )
-                    cell.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
-                    cell.bind("<Enter>", lambda e, c=cell, hb=hover_bg: c.config(bg=hb))
-                    cell.bind("<Leave>", lambda e, c=cell, ob=bg: c.config(bg=ob))
+                    total_hours += self._entry_hours(entry)
 
+                cell = self._build_day_cell(
+                    new_frame, date_str, str(day), day_date,
+                    is_weekend=col >= 5, entry=entry, holidays_map=holidays_map,
+                    pad=4, empty_height=3, holiday_max_len=12,
+                )
                 cell.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
 
-        for col in range(7):
-            new_frame.columnconfigure(col, weight=1)
-
-        # Swap frames: destroy old, place new
-        self.grid_frame.destroy()
-        self.grid_frame = new_frame
-        self.grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5,
-                             before=self.footer_label.master)
-
-        rate = self.settings.get("hourly_rate") or 0
-        if rate > 0:
-            brutto = round(total_hours * rate, 2)
-            self.footer_label.config(
-                text=f"Gesamt: {round(total_hours, 2)}h  —  {brutto:.2f} € brutto"
-            )
-        else:
-            self.footer_label.config(text=f"Gesamt: {round(total_hours, 2)}h")
+        self._swap_grid(new_frame)
+        self._update_footer(total_hours)
 
     def _refresh_week(self):
         new_frame = tk.Frame(self.root, bg=BG)
-
-        # Column headers
-        for col, day_name in enumerate(DAYS_DE):
-            fg = TEXT_MUTED if col < 5 else WEEKEND_FG
-            lbl = tk.Label(
-                new_frame, text=day_name, font=FONT_BOLD,
-                bg=BG, fg=fg
-            )
-            lbl.grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
+        self._build_grid_header(new_frame)
 
         dates = get_week_dates(self.iso_year, self.current_week)
         entries = self.storage.get_all()
@@ -460,82 +469,20 @@ class App:
         for col, day_date in enumerate(dates):
             date_str = day_date.isoformat()
             entry = entries.get(date_str)
-            is_weekend = col >= 5
+            if entry:
+                total_hours += self._entry_hours(entry)
             day_text = f"{day_date.day}.{day_date.month}." if spans else str(day_date.day)
 
-            fg = TEXT
-            if is_weekend and not entry:
-                fg = WEEKEND_FG
-
-            if entry:
-                pause = entry.get("pause", 0)
-                hours = calculate_hours(entry["start"], entry["end"], pause_minutes=pause)
-                total_hours += hours
-                bg = WEEKEND_ENTRY_BG if is_weekend else ENTRY_BG
-                cell = tk.Frame(
-                    new_frame, bg=bg, relief=tk.SOLID,
-                    highlightbackground=ACCENT, highlightthickness=1,
-                    cursor="hand2"
-                )
-                day_lbl = tk.Label(
-                    cell, text=day_text, font=FONT,
-                    bg=bg, fg=TEXT, cursor="hand2"
-                )
-                day_lbl.pack(pady=(8, 0))
-                time_lbl = tk.Label(
-                    cell, text=f"{entry['start']}-{entry['end']}",
-                    font=FONT_SMALL, bg=bg, fg=TEXT_MUTED, cursor="hand2"
-                )
-                time_lbl.pack(pady=(0, 8))
-                hover_bg = WEEKEND_ENTRY_BG_HOVER if is_weekend else ENTRY_BG_HOVER
-                for w in (cell, day_lbl, time_lbl):
-                    w.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
-                    w.bind("<Button-3>", lambda e, d=date_str: self._delete_entry(d))
-                    w.bind("<Enter>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, hb=hover_bg: self._cell_hover(c, dl, tl, hb))
-                    w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, tl=time_lbl, ob=bg: self._cell_hover(c, dl, tl, ob))
-                if day_date in holidays_map:
-                    attach_tooltip(cell, f"Feiertag: {holidays_map[day_date]}")
-            elif day_date in holidays_map:
-                cell = self._build_holiday_cell(
-                    new_frame,
-                    day_text=day_text,
-                    name=holidays_map[day_date],
-                    max_name_len=18,
-                    on_click=lambda d=date_str: self._open_dialog(d),
-                    cell_size=cell_size,
-                )
-            else:
-                bg = WEEKEND_BG if is_weekend else CELL_BG
-                hover_bg = WEEKEND_BG_HOVER if is_weekend else CELL_BG_HOVER
-                cell = tk.Label(
-                    new_frame, text=day_text, font=FONT,
-                    bg=bg, fg=fg, relief=tk.FLAT,
-                    width=8, height=5, cursor="hand2"
-                )
-                cell.bind("<Button-1>", lambda e, d=date_str: self._open_dialog(d))
-                cell.bind("<Enter>", lambda e, c=cell, hb=hover_bg: c.config(bg=hb))
-                cell.bind("<Leave>", lambda e, c=cell, ob=bg: c.config(bg=ob))
-
+            cell = self._build_day_cell(
+                new_frame, date_str, day_text, day_date,
+                is_weekend=col >= 5, entry=entry, holidays_map=holidays_map,
+                pad=8, empty_height=5, holiday_max_len=18,
+                holiday_cell_size=cell_size,
+            )
             cell.grid(row=1, column=col, sticky="nsew", padx=2, pady=2)
 
-        for col in range(7):
-            new_frame.columnconfigure(col, weight=1)
-
-        # Swap frames
-        self.grid_frame.destroy()
-        self.grid_frame = new_frame
-        self.grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5,
-                             before=self.footer_label.master)
-
-        # Footer
-        rate = self.settings.get("hourly_rate") or 0
-        if rate > 0:
-            brutto = round(total_hours * rate, 2)
-            self.footer_label.config(
-                text=f"Gesamt: {round(total_hours, 2)}h  —  {brutto:.2f} € brutto"
-            )
-        else:
-            self.footer_label.config(text=f"Gesamt: {round(total_hours, 2)}h")
+        self._swap_grid(new_frame)
+        self._update_footer(total_hours)
 
     @staticmethod
     def _truncate(text: str, max_len: int) -> str:

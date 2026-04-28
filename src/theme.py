@@ -134,6 +134,33 @@ def set_toggle_active(btn, active):
         )
 
 
+def center_dialog_on_parent(dialog, parent):
+    """Position a Toplevel dialog over its parent's screen rect.
+
+    Tk-Default platziert Toplevels auf dem Primärmonitor — bei Multi-Monitor-
+    Setups öffnet sich der Dialog daher nicht beim Parent. transient() bindet
+    den Dialog zusätzlich an den Parent (Icon, Z-Order, gemeinsam minimieren).
+
+    Wenn der Dialog größer als der Parent ist (z.B. Settings-Modal über
+    kleinem App-Fenster), wird statt zentriert auf Parent-Top-Left
+    ausgerichtet — sonst rutscht die Titlebar oberhalb des Monitorrands.
+
+    Muss gerufen werden, nachdem alle Widgets erstellt sind, damit
+    winfo_reqwidth/reqheight die finale Größe liefern.
+    """
+    dialog.transient(parent)
+    dialog.update_idletasks()
+    w = dialog.winfo_reqwidth()
+    h = dialog.winfo_reqheight()
+    px = parent.winfo_rootx()
+    py = parent.winfo_rooty()
+    pw = parent.winfo_width()
+    ph = parent.winfo_height()
+    x = px + max(0, (pw - w) // 2)
+    y = py + max(0, (ph - h) // 2)
+    dialog.geometry(f"+{x}+{y}")
+
+
 def icon_button(parent, text, command, fg=ACCENT, hover_fg=None, **kw):
     """Compact icon-style button used in the header (‹ › ⚙)."""
     if hover_fg is None:

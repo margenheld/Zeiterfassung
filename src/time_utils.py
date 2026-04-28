@@ -1,5 +1,11 @@
 import datetime
 
+DAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+MONTHS_DE = [
+    "", "Januar", "Februar", "März", "April", "Mai", "Juni",
+    "Juli", "August", "September", "Oktober", "November", "Dezember",
+]
+
 
 def parse_time(time_str):
     """Parse HH:MM string. Returns (hours, minutes) or None if invalid."""
