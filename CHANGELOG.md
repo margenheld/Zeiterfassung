@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.9.0
+- Update-Check beim App-Start: einmal pro Kalendertag wird die GitHub-Releases-API abgefragt. Liegt eine neuere Version vor, erscheint zwischen Header und Kalender ein Banner mit dem Versions-Hinweis und einem **Download**-Button, der direkt das passende Plattform-Asset (`.exe` / `.dmg` / `.AppImage`) im Browser öffnet
+- Fallback auf die Release-Page, falls kein Plattform-Asset gefunden wird (z.B. Intel-Mac oder ARM-Linux)
+- ✕-Symbol blendet die jeweilige Version dauerhaft aus — Banner kommt erst wieder, wenn eine noch neuere Version released wird (Tooltip: „Diese Version ausblenden")
+- Netzwerk-/API-Fehler werden still verschluckt — der Hinweis ist nice-to-have und stört einen Offline-Start nicht. Drosselung und Dismiss werden in `settings.json` persistiert (`last_update_check_at`, `dismissed_version`)
+
 ## v1.8.3
 - Pfeiltasten `<Left>` / `<Right>` navigieren im Hauptfenster durch Monate bzw. Wochen — analog zu den `‹`/`›` Buttons im Header. Modal-Dialoge fangen die Tasten automatisch ab, sodass `<Left>`/`<Right>` in Eingabefeldern weiterhin den Cursor bewegen
 
