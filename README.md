@@ -12,6 +12,7 @@ Desktop-App zur Erfassung von Arbeitszeiten mit Kalenderansicht, PDF-Report und 
 - **Zeitraumwahl** — Flexibler Datumsbereich für Reports
 - **Einstellungen** — E-Mail-Vorlagen mit Platzhaltern, Standardpause, Empfänger
 - **Autostart** — Optionaler minimierter Start bei Anmeldung (Windows, macOS, Linux)
+- **Update-Check** — Prüft beim Start einmal pro Tag auf neuere Releases und zeigt einen unaufdringlichen Banner mit Direkt-Download
 - **Dark Mode UI** — Modernes dunkles Design
 - **Standalone .exe** — Per PyInstaller als einzelne Datei paketierbar
 
@@ -27,6 +28,7 @@ Zeiterfassung/
 │   ├── report.py        # HTML- & PDF-Reportgenerierung
 │   ├── mail.py          # Gmail OAuth2-Authentifizierung & Versand
 │   ├── autostart.py     # Plattformabhängiger Autostart (Windows/macOS/Linux)
+│   ├── updater.py       # GitHub-Releases-Check (stdlib-only, gedrosselt 1×/Tag)
 │   ├── time_utils.py    # Zeitberechnung und Validierung
 │   └── paths.py         # Pfadauflösung (Script- vs. Frozen-Modus)
 ├── tests/               # pytest-Testdateien
