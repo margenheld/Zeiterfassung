@@ -27,7 +27,7 @@ from src.dialogs.entry_dialog import open_entry_dialog
 from src.dialogs.send_dialog import open_send_dialog
 from src.dialogs.settings_dialog import open_settings_dialog
 from src.theme import (
-    BG, CELL_BG, WEEKEND_BG, ACCENT, TEXT, TEXT_MUTED,
+    BG, CELL_BG, WEEKEND_BG, ACCENT, ACCENT_HOVER, TEXT, TEXT_MUTED,
     ENTRY_BG, WEEKEND_ENTRY_BG, WEEKEND_FG,
     HOLIDAY_BG, HOLIDAY_BG_HOVER, HOLIDAY_ACCENT,
     FONT, FONT_BOLD, FONT_HEADER, FONT_FOOTER, FONT_SMALL,
@@ -172,17 +172,21 @@ class App:
             bg=ACCENT, fg="#ffffff", font=FONT_BOLD,
         ).pack(side=tk.LEFT, padx=10, pady=6)
 
-        icon_button(
-            self._update_banner, "✕",
-            lambda: self._dismiss_update_banner(release.version),
-            fg="#ffffff", hover_fg=TEXT,
-        ).pack(side=tk.RIGHT, padx=(0, 6))
+        tk.Button(
+            self._update_banner, text="✕",
+            command=lambda: self._dismiss_update_banner(release.version),
+            font=FONT_BOLD, bg=ACCENT, fg="#ffffff",
+            activebackground=ACCENT_HOVER, activeforeground="#ffffff",
+            relief=tk.FLAT, cursor="hand2", bd=0, padx=8,
+        ).pack(side=tk.RIGHT, padx=(0, 4))
 
-        secondary_button(
-            self._update_banner, "Download",
-            lambda: self._open_update_download(release),
-            padx=12,
-        ).pack(side=tk.RIGHT, padx=6)
+        tk.Button(
+            self._update_banner, text="Download",
+            command=lambda: self._open_update_download(release),
+            font=FONT_BOLD, bg="#ffffff", fg=ACCENT,
+            activebackground="#f0f0f0", activeforeground=ACCENT_HOVER,
+            relief=tk.FLAT, cursor="hand2", bd=0, padx=14, pady=2,
+        ).pack(side=tk.RIGHT, padx=8, pady=4)
 
     def _open_update_download(self, release: "Release"):
         url = pick_asset_url(
