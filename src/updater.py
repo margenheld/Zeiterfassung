@@ -4,6 +4,7 @@ Single Purpose: Netzwerk-Call, Versions-Vergleich, Asset-Match, Throttle.
 Keine Tk-Imports; UI-Layer ruft die Funktionen aus einem Worker-Thread.
 """
 
+from dataclasses import dataclass
 from datetime import date
 
 
@@ -36,3 +37,31 @@ def should_check_today(last_check: str | None, today: date | None = None) -> boo
     except ValueError:
         return True
     return last < today
+
+
+@dataclass(frozen=True)
+class Asset:
+    name: str
+    url: str
+
+
+@dataclass(frozen=True)
+class Release:
+    version: str        # ohne v-Prefix, z.B. "1.9.0"
+    html_url: str       # Release-Page auf GitHub
+    assets: tuple[Asset, ...]
+
+
+def pick_asset_url(assets, system: str, latest_version: str) -> str | None:
+    """Liefert die Download-URL für das Plattform-Asset oder None."""
+    expected_name = {
+        "Windows": "Zeiterfassung_Setup.exe",
+        "Darwin": f"Zeiterfassung-{latest_version}-arm64.dmg",
+        "Linux": f"Zeiterfassung-{latest_version}-x86_64.AppImage",
+    }.get(system)
+    if expected_name is None:
+        return None
+    for asset in assets:
+        if asset.name == expected_name:
+            return asset.url
+    return None
