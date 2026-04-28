@@ -35,8 +35,20 @@ class Settings:
                 self._data = dict(DEFAULTS)
 
     def _save_to_disk(self):
-        with open(self.filepath, "w", encoding="utf-8") as f:
+        # Atomic write: temp file + replace, damit ein Crash mid-write
+        # kein halb geschriebenes settings.json hinterlässt. Relevant, weil
+        # der Update-Banner den Settings-Write aus einem Worker-Thread
+        # via root.after auf den UI-Thread schiebt und parallel zum Settings-
+        # Dialog schreiben kann.
+        tmp = self.filepath + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2, ensure_ascii=False)
+        try:
+            os.replace(tmp, self.filepath)
+        except OSError:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            raise
 
     def get(self, key):
         return self._data.get(key, DEFAULTS.get(key))
