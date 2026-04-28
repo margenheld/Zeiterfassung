@@ -2,7 +2,7 @@
 
 Desktop-App zur Erfassung von Arbeitszeiten mit Kalenderansicht, PDF-Report und automatischem Gmail-Versand.
 
-[![Release](https://img.shields.io/github/v/release/margenheld/Zeiterfassung?label=Release&color=success)](https://github.com/margenheld/Zeiterfassung/releases/latest) ![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+[![Release](https://img.shields.io/github/v/release/margenheld/Zeiterfassung?label=Release&color=success&logo=github)](https://github.com/margenheld/Zeiterfassung/releases/latest) ![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
 ## Features
 
