@@ -131,6 +131,11 @@ class TestCheckLatestRelease:
         with patch("src.updater.urlopen", return_value=_api_response(payload)):
             assert check_latest_release("any/repo") is None
 
+    def test_missing_html_url_returns_none(self):
+        payload = {"tag_name": "v1.9.0", "assets": []}
+        with patch("src.updater.urlopen", return_value=_api_response(payload)):
+            assert check_latest_release("any/repo") is None
+
     def test_malformed_assets_are_filtered(self):
         # Asset ohne browser_download_url + Asset als String → werden geskippt
         payload = {
