@@ -156,3 +156,84 @@ def test_iso_week_across_year_boundary():
     }
     html, total = generate_report(datetime.date(2025, 12, 1), datetime.date(2026, 1, 31), entries)
     assert "KW 1" in html
+
+
+from unittest.mock import patch, MagicMock
+
+
+# --- HTML-Escaping ---
+
+def test_greeting_with_ampersand_is_escaped():
+    entries = {"2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0}}
+    html, _ = generate_report(
+        datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries,
+        greeting="Mayer & Söhne,",
+    )
+    assert "Mayer &amp; Söhne," in html
+    assert "Mayer & Söhne" not in html
+
+
+def test_greeting_with_html_tag_is_escaped():
+    entries = {"2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0}}
+    html, _ = generate_report(
+        datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries,
+        greeting="<script>alert(1)</script>",
+    )
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "<script>alert(1)</script>" not in html
+
+
+def test_content_newline_becomes_br():
+    entries = {"2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0}}
+    html, _ = generate_report(
+        datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries,
+        content="Zeile1\nZeile2",
+    )
+    assert "Zeile1<br>Zeile2" in html
+
+
+def test_closing_with_lt_and_newline_escaped_with_br():
+    entries = {"2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0}}
+    html, _ = generate_report(
+        datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries,
+        closing="A < B\nFreundlich",
+    )
+    # `<` muss escaped sein, `<br>` darf NICHT escaped sein
+    assert "A &lt; B<br>Freundlich" in html
+    assert "&lt;br&gt;" not in html
+
+
+def test_placeholder_zeitraum_replaced_after_escape():
+    entries = {"2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0}}
+    html, _ = generate_report(
+        datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries,
+        content="Zeitraum: {zeitraum}",
+    )
+    assert "Zeitraum: 01.03.2026 – 31.03.2026" in html
+
+
+def test_pdf_name_is_escaped():
+    """generate_pdf escaped name vor der HTML-Generierung. xhtml2pdf wird
+    gemockt, damit der Test ohne installierte Lib läuft (CI-kompatibel)."""
+    from src import report as report_mod
+    entries = {"2026-03-23": {"start": "08:00", "end": "16:00", "pause": 0}}
+
+    captured_html = {}
+
+    class FakePisa:
+        @staticmethod
+        def CreatePDF(html_str, dest):
+            captured_html["html"] = html_str
+            return MagicMock(err=0)
+
+    fake_xhtml2pdf = MagicMock()
+    fake_xhtml2pdf.pisa = FakePisa
+
+    with patch.dict("sys.modules", {"xhtml2pdf": fake_xhtml2pdf}):
+        report_mod.generate_pdf(
+            datetime.date(2026, 3, 1), datetime.date(2026, 3, 31), entries,
+            name="Müller & Co",
+        )
+
+    assert "Müller &amp; Co" in captured_html["html"]
+    assert "Müller & Co" not in captured_html["html"]
