@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.9.2
+- Mail-Templates (Anrede, Inhalt, Gruß, Name) und der Bericht escapen Sonderzeichen jetzt korrekt — `&`, `<`, `>` werden im Mail-HTML und PDF nicht mehr roh ausgegeben. **Behavior-Change:** wer bisher bewusst HTML-Tags wie `<b>` oder `<br>` in den Mail-Templates verwendet hat, sieht diese jetzt als Klartext. Zeilenumbrüche im Inhalt/Gruß werden weiterhin korrekt umgebrochen
+- `token.json` wird auf macOS/Linux mit `0600`-Permissions geschrieben — der Refresh-Token mit Gmail-Send-Scope ist auf Multi-User-Systemen nicht mehr für andere User lesbar (Windows ignoriert Unix-Permissions)
+- Settings-Speichern macht statt 12 separater Disk-Roundtrips nur noch einen einzigen — minimiert das Risiko verlorener Updates, wenn der Update-Banner-Worker parallel zum Settings-Dialog schreibt
+- Neues Logfile unter `<Datenordner>/logs/zeiterfassung.log` (rotierend, max. 4 MB Gesamtvolumen). App-Start, uncaught Exceptions im Tk-Mainloop und alle Sendepfad-Fehler landen dort — bei `--noconsole`-Builds (Windows-Release) gab es bisher keine Spur von Crashes
+- `settings.json` wird beim Laden gegen die erwarteten Typen validiert. Ein manuell verändertes Feld mit falschem Typ (z.B. String statt Int) lässt die App nicht mehr abstürzen, sondern fällt auf den Default zurück und schreibt eine Warnung ins Logfile
+
 ## v1.9.1
 - Multi-Monitor-Fix: Settings-, Eintrags-, Sende- und Credentials-Dialoge öffnen sich jetzt zuverlässig auf demselben Monitor wie das Hauptfenster (vorher landeten sie immer auf dem Primärmonitor). Wenn der Dialog grösser ist als das App-Fenster, wird er an Parent-Top-Left ausgerichtet, damit die Titlebar nicht über den Bildschirmrand rutscht
 - `settings.json` wird jetzt atomar geschrieben (temp + replace), damit ein Crash mid-write keine korrupte Datei hinterlassen kann — relevant, weil Settings-Dialog und Update-Banner-Worker parallel schreiben können
