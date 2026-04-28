@@ -188,3 +188,30 @@ def test_failed_refresh_does_not_overwrite_token(tmp_path):
 
     with open(path) as f:
         assert f.read() == "original-content"
+
+
+import platform  # noqa: E402
+import stat  # noqa: E402
+
+
+@pytest.mark.skipif(
+    platform.system() == "Windows",
+    reason="Windows hat kein POSIX-Permission-Modell",
+)
+def test_refresh_writes_token_with_0600_permissions(tmp_path):
+    """Nach erfolgreichem Refresh hat token.json Mode 0o600."""
+    path = str(tmp_path / "token.json")
+    open(path, "w").close()
+
+    fake_creds = MagicMock()
+    fake_creds.valid = False
+    fake_creds.expired = True
+    fake_creds.refresh_token = "rt"
+    fake_creds.to_json.return_value = '{"fresh": true}'
+
+    with patch("google.oauth2.credentials.Credentials.from_authorized_user_file",
+               return_value=fake_creds):
+        refresh_token_if_needed(path)
+
+    mode = os.stat(path).st_mode & 0o777
+    assert mode == 0o600, f"Erwartete 0o600, ist {oct(mode)}"

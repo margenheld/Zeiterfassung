@@ -4,6 +4,7 @@ from tkinter import messagebox
 import calendar
 import ctypes
 import datetime
+import logging
 import os
 import platform
 import threading
@@ -105,6 +106,7 @@ class App:
             except TokenNetworkError:
                 pass
             except Exception as e:
+                logging.getLogger(__name__).exception("Token-Refresh fehlgeschlagen")
                 err = f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
                 self.root.after(0, lambda: messagebox.showerror(
                     "Token-Refresh fehlgeschlagen", err
@@ -134,6 +136,8 @@ class App:
             except Exception:
                 # Pure Logik, robust gegen exotische Tags. Bei jedem Fehler:
                 # nichts persistieren, nichts anzeigen — morgen nochmal probieren.
+                # Trace landet im Logfile, falls jemand den Fehler diagnostizieren will.
+                logging.getLogger(__name__).exception("Update-Check fehlgeschlagen")
                 return
             self.root.after(
                 0, lambda: self._handle_update_check_result(release, newer)

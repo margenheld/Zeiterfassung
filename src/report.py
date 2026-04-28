@@ -1,8 +1,18 @@
 import datetime
+import html
 import io
 from collections import OrderedDict
 
 from src.time_utils import DAYS_DE, calculate_hours, get_week_label
+
+
+def _esc(text):
+    return html.escape(text or "", quote=True)
+
+
+def _esc_multiline(text):
+    return _esc(text).replace("\n", "<br>")
+
 
 COLUMN_LABELS = ["Datum", "Tag", "Start", "Ende", "Stunden"]
 
@@ -83,9 +93,15 @@ def _filter_entries(date_from, date_to, all_entries):
 
 
 def _apply_placeholders(text, label, total):
-    return text.replace("{zeitraum}", label).replace("{gesamt}", f"{total}h")
+    # text ist bereits escaped; label und total sind strukturell sicher
+    # (Datum + Float), werden aber für Konsistenz ebenfalls escaped.
+    return text.replace("{zeitraum}", _esc(label)).replace("{gesamt}", _esc(f"{total}h"))
 
 
+# _week_block und _build_table rendern Werte aus dem Storage (entry["start"],
+# entry["end"], weekday, day_fmt, iso_week). Diese sind durch validate_entry
+# bzw. datetime-Formatter strukturell auf [0-9:.-] beschränkt — kein Escape
+# nötig. Wenn diese Quelle sich mal ändert (z.B. freie Eingabe), Escape ergänzen.
 def _week_block(iso_year, iso_week, week_entries, style):
     """Render einen Wochen-Block (KW-Header, Tageszeilen, Wochensumme).
     Returns (rows_html, week_total)."""
@@ -167,16 +183,16 @@ def generate_report(date_from, date_to, all_entries, greeting="", content="", cl
     groups = _group_by_week(range_entries)
     table, total = _build_table(groups, HTML_STYLE)
 
-    greeting_filled = _apply_placeholders(greeting, label, total)
-    content_filled = _apply_placeholders(content, label, total)
-    closing_filled = _apply_placeholders(closing, label, total)
+    greeting_filled = _apply_placeholders(_esc_multiline(greeting), label, total)
+    content_filled = _apply_placeholders(_esc_multiline(content), label, total)
+    closing_filled = _apply_placeholders(_esc_multiline(closing), label, total)
 
     text_style = "color:#cbd5e1;font-size:14px;line-height:1.6;margin:0 0 16px 0;"
     greeting_html = f'<p style="{text_style}">{greeting_filled}</p>' if greeting_filled else ""
     content_html = f'<p style="{text_style}">{content_filled}</p>' if content_filled else ""
     closing_html = f'<p style="{text_style}margin-top:24px;white-space:pre-line;">{closing_filled}</p>' if closing_filled else ""
 
-    html = f"""<html><head><meta charset="utf-8"><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>
+    html_out = f"""<html><head><meta charset="utf-8"><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>
 <body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;">
 <div style="max-width:640px;margin:0 auto;padding:32px 24px;">
 {greeting_html}
@@ -186,7 +202,7 @@ def generate_report(date_from, date_to, all_entries, greeting="", content="", cl
 </div>
 </body></html>"""
 
-    return html, total
+    return html_out, total
 
 
 def generate_pdf(date_from, date_to, all_entries, name=""):
@@ -202,7 +218,7 @@ def generate_pdf(date_from, date_to, all_entries, name=""):
     table, _ = _build_table(groups, PDF_STYLE)
 
     name_html = (
-        f"<p style='color:#111827;font-size:13px;margin:0 0 2px 0;font-weight:600;'>{name}</p>"
+        f"<p style='color:#111827;font-size:13px;margin:0 0 2px 0;font-weight:600;'>{_esc(name)}</p>"
         if name else ""
     )
 
@@ -210,7 +226,7 @@ def generate_pdf(date_from, date_to, all_entries, name=""):
 <body style="margin:0;padding:20px;font-family:Arial,sans-serif;font-size:12px;color:#111827;">
 <h2 style="font-size:18px;margin:0 0 4px 0;color:#111827;">Zeiterfassung</h2>
 {name_html}
-<p style="color:#4b5563;font-size:12px;margin:0 0 16px 0;">{label}</p>
+<p style="color:#4b5563;font-size:12px;margin:0 0 16px 0;">{_esc(label)}</p>
 {table}
 </body></html>"""
 

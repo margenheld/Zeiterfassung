@@ -1,3 +1,4 @@
+import logging
 import os
 import tkinter as tk
 import traceback
@@ -50,6 +51,7 @@ def open_settings_dialog(parent, settings, base_path, on_change):
         try:
             open_folder(base_path)
         except Exception as e:
+            logging.getLogger(__name__).exception("Datenordner konnte nicht geöffnet werden")
             messagebox.showerror(
                 "Ordner konnte nicht geöffnet werden",
                 f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}",
@@ -160,6 +162,8 @@ def open_settings_dialog(parent, settings, base_path, on_change):
         new_autostart = autostart_var.get()
         old_autostart = settings.get("autostart")
 
+        # Autostart-Toggle muss vor dem Settings-Write passieren, weil
+        # er failen kann und dann nichts persistiert werden soll.
         if new_autostart != old_autostart:
             try:
                 if new_autostart:
@@ -167,7 +171,6 @@ def open_settings_dialog(parent, settings, base_path, on_change):
                     enable_autostart(target, arguments)
                 else:
                     disable_autostart()
-                settings.set("autostart", new_autostart)
             except Exception as e:
                 messagebox.showerror(
                     "Autostart-Fehler",
@@ -176,27 +179,33 @@ def open_settings_dialog(parent, settings, base_path, on_change):
                 )
                 return
 
-        settings.set("email", email_var.get())
-        settings.set("default_start", start_var.get())
-        settings.set("default_end", end_var.get())
-        settings.set("default_pause", int(pause_var.get()))
-        settings.set("recipient", recipient_var.get())
-        settings.set("name", name_var.get())
-        settings.set("mail_subject", subject_var.get())
-        settings.set("mail_greeting", greeting_var.get())
-        settings.set("mail_content", content_text.get("1.0", "end-1c"))
-        settings.set("mail_closing", closing_text.get("1.0", "end-1c"))
         rate_str = rate_var.get().strip()
         try:
-            settings.set("hourly_rate", float(rate_str) if rate_str else 0.0)
+            hourly_rate = float(rate_str) if rate_str else 0.0
         except ValueError:
-            settings.set("hourly_rate", 0.0)
+            hourly_rate = 0.0
+
         selected_label = state_var.get()
         selected_code = next(
             (code for code, lbl in STATES if lbl == selected_label),
             "",
         )
-        settings.set("state", selected_code)
+
+        settings.set_many({
+            "autostart": new_autostart,
+            "email": email_var.get(),
+            "default_start": start_var.get(),
+            "default_end": end_var.get(),
+            "default_pause": int(pause_var.get()),
+            "recipient": recipient_var.get(),
+            "name": name_var.get(),
+            "mail_subject": subject_var.get(),
+            "mail_greeting": greeting_var.get(),
+            "mail_content": content_text.get("1.0", "end-1c"),
+            "mail_closing": closing_text.get("1.0", "end-1c"),
+            "hourly_rate": hourly_rate,
+            "state": selected_code,
+        })
         on_change()
         dialog.destroy()
 

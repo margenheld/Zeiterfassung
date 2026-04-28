@@ -1,6 +1,7 @@
 # src/mail.py
-import os
 import base64
+import os
+import stat
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
@@ -17,6 +18,21 @@ class TokenNetworkError(Exception):
     """Refresh fehlgeschlagen wegen Netzwerkproblem."""
 
 
+def _write_token(creds, token_path):
+    """Persistiere Credentials und setze restriktive Permissions (Unix only).
+
+    Auf Windows bleibt das chmod ein No-op — POSIX-Permissions gibt es
+    dort nicht. `try/except OSError` deckt zusätzlich exotische Filesystems
+    (sshfs, FAT32 auf USB-Stick) ab, wo chmod fehlschlagen kann.
+    """
+    with open(token_path, "w") as f:
+        f.write(creds.to_json())
+    try:
+        os.chmod(token_path, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+    except OSError:
+        pass
+
+
 def _refresh_and_persist(creds, token_path):
     """Refresh credentials and write them back. Translates Google exceptions."""
     from google.auth.exceptions import RefreshError, TransportError
@@ -29,8 +45,7 @@ def _refresh_and_persist(creds, token_path):
     except TransportError as e:
         raise TokenNetworkError(str(e)) from e
 
-    with open(token_path, "w") as f:
-        f.write(creds.to_json())
+    _write_token(creds, token_path)
 
 
 def refresh_token_if_needed(token_path="token.json"):
@@ -93,8 +108,7 @@ def get_gmail_service(credentials_path="credentials.json", token_path="token.jso
             )
         flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
         creds = flow.run_local_server(port=0)
-        with open(token_path, "w") as f:
-            f.write(creds.to_json())
+        _write_token(creds, token_path)
 
     return build("gmail", "v1", credentials=creds)
 

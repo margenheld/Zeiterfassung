@@ -1,5 +1,6 @@
 import calendar
 import datetime
+import logging
 import os
 import tkinter as tk
 import traceback
@@ -38,6 +39,7 @@ def show_missing_credentials_dialog(parent, base_path):
         try:
             open_folder(base_path)
         except Exception as e:
+            logging.getLogger(__name__).exception("Datenordner konnte nicht geöffnet werden")
             messagebox.showerror(
                 "Ordner konnte nicht geöffnet werden",
                 f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}",
@@ -186,6 +188,7 @@ def open_send_dialog(parent, storage, settings, base_path):
         except FileNotFoundError as e:
             messagebox.showerror("Fehler", str(e), parent=dialog)
         except Exception as e:
+            logging.getLogger(__name__).exception("Senden fehlgeschlagen")
             messagebox.showerror(
                 "Senden fehlgeschlagen",
                 f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}",

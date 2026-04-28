@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 DEFAULTS = {
@@ -19,6 +20,33 @@ DEFAULTS = {
     "dismissed_version": "",
 }
 
+_COERCE_FAILED = object()
+
+
+def _coerce(value, default):
+    """Versuche `value` in den Typ von `default` zu casten.
+
+    Liefert den gecasteten Wert oder `_COERCE_FAILED`. bool ist Subklasse
+    von int — wir verlangen für bool-Defaults strikt einen bool, sonst
+    wäre `1` versehentlich `True`.
+    """
+    target_type = type(default)
+    if target_type is bool:
+        return value if isinstance(value, bool) else _COERCE_FAILED
+    if isinstance(value, target_type) and not isinstance(value, bool):
+        return value
+    try:
+        if target_type is int:
+            return int(value)
+        if target_type is float:
+            return float(value)
+        if target_type is str:
+            return str(value)
+    except (TypeError, ValueError):
+        return _COERCE_FAILED
+    return _COERCE_FAILED
+
+
 class Settings:
     def __init__(self, filepath="settings.json"):
         self.filepath = filepath
@@ -26,13 +54,39 @@ class Settings:
         self._load()
 
     def _load(self):
-        if os.path.exists(self.filepath):
-            try:
-                with open(self.filepath, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                self._data.update(loaded)
-            except (json.JSONDecodeError, ValueError):
-                self._data = dict(DEFAULTS)
+        if not os.path.exists(self.filepath):
+            return
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            self._data = dict(DEFAULTS)
+            return
+
+        log = logging.getLogger(__name__)
+        if not isinstance(loaded, dict):
+            log.warning(
+                "settings.json hat unerwartetes Toplevel-Format (%s), "
+                "verwerfe Inhalt und verwende Defaults",
+                type(loaded).__name__,
+            )
+            self._data = dict(DEFAULTS)
+            return
+
+        for key, default_value in DEFAULTS.items():
+            if key not in loaded:
+                continue
+            coerced = _coerce(loaded[key], default_value)
+            if coerced is _COERCE_FAILED:
+                log.warning(
+                    "settings.json: Wert für %r (%r, Typ %s) ist nicht in Typ %s "
+                    "castbar — verwende Default %r",
+                    key, loaded[key], type(loaded[key]).__name__,
+                    type(default_value).__name__, default_value,
+                )
+                continue
+            self._data[key] = coerced
+        # Unbekannte Keys aus loaded werden ignoriert (nicht in _data übernommen).
 
     def _save_to_disk(self):
         # Atomic write: temp file + replace, damit ein Crash mid-write
@@ -54,5 +108,14 @@ class Settings:
         return self._data.get(key, DEFAULTS.get(key))
 
     def set(self, key, value):
-        self._data[key] = value
+        self.set_many({key: value})
+
+    def set_many(self, updates):
+        """Mehrere Werte setzen, einmal auf Platte schreiben.
+
+        Leeres Dict ist No-op (kein Disk-Roundtrip).
+        """
+        if not updates:
+            return
+        self._data.update(updates)
         self._save_to_disk()
