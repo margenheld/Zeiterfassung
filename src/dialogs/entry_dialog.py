@@ -5,7 +5,8 @@ from tkinter import messagebox
 from src.holidays_de import get_holidays
 from src.theme import (
     BG, FONT, PAUSE_VALUES, TEXT, TIME_VALUES,
-    apply_combobox_style, dark_combo, primary_button, secondary_button,
+    apply_combobox_style, center_dialog_on_parent,
+    dark_combo, primary_button, secondary_button,
 )
 from src.time_utils import validate_entry
 
@@ -84,3 +85,5 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change):
 
     primary_button(btn_frame, "Speichern", save).pack(side=tk.LEFT, padx=5)
     secondary_button(btn_frame, "Löschen", delete).pack(side=tk.LEFT, padx=5)
+
+    center_dialog_on_parent(dialog, parent)

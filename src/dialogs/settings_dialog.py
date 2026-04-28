@@ -8,7 +8,8 @@ from src.platform_open import open_folder
 from src.theme import (
     ACCENT, BG, CELL_BG, FONT, FONT_BOLD, FONT_SMALL,
     PAUSE_VALUES, STATUS_OK, TEXT, TEXT_MUTED, TIME_VALUES,
-    apply_combobox_style, dark_combo, dark_entry, dark_text,
+    apply_combobox_style, center_dialog_on_parent,
+    dark_combo, dark_entry, dark_text,
     primary_button, secondary_button,
 )
 from src.holidays_de import STATES
@@ -204,3 +205,5 @@ def open_settings_dialog(parent, settings, base_path, on_change):
 
     primary_button(btn_frame, "Speichern", save_settings).pack(side=tk.LEFT, padx=5)
     secondary_button(btn_frame, "Abbrechen", dialog.destroy).pack(side=tk.LEFT, padx=5)
+
+    center_dialog_on_parent(dialog, parent)
