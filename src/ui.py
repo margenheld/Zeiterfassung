@@ -172,13 +172,15 @@ class App:
             bg=ACCENT, fg="#ffffff", font=FONT_BOLD,
         ).pack(side=tk.LEFT, padx=10, pady=6)
 
-        tk.Button(
+        dismiss_btn = tk.Button(
             self._update_banner, text="✕",
             command=lambda: self._dismiss_update_banner(release.version),
             font=FONT_BOLD, bg=ACCENT, fg="#ffffff",
             activebackground=ACCENT_HOVER, activeforeground="#ffffff",
             relief=tk.FLAT, cursor="hand2", bd=0, padx=8,
-        ).pack(side=tk.RIGHT, padx=(0, 4))
+        )
+        dismiss_btn.pack(side=tk.RIGHT, padx=(0, 4))
+        attach_tooltip(dismiss_btn, "Diese Version ausblenden")
 
         tk.Button(
             self._update_banner, text="Download",
