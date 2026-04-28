@@ -8,11 +8,20 @@ import os
 import platform
 import threading
 import traceback
+import webbrowser
 from src.time_utils import calculate_hours, get_week_dates, get_week_label, week_spans_months
 from src.holidays_de import get_holidays
 from src.tooltip import attach_tooltip
 from src.mail import refresh_token_if_needed, TokenAuthError, TokenNetworkError
 from src.version import VERSION
+from src.updater import (
+    check_latest_release,
+    is_newer,
+    pick_asset_url,
+    should_check_today,
+    today_iso,
+    Release,
+)
 
 from src.dialogs.entry_dialog import open_entry_dialog
 from src.dialogs.send_dialog import open_send_dialog
@@ -75,6 +84,8 @@ class App:
         self.root.bind("<Right>", lambda e: self._next())
         self._refresh()
         self._proactive_token_refresh()
+        self._update_banner = None
+        self._proactive_update_check()
 
     def _proactive_token_refresh(self):
         """Erneuert den Gmail-Token beim App-Start im Hintergrund.
@@ -104,6 +115,86 @@ class App:
                 ))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _proactive_update_check(self):
+        """Fragt einmal pro Kalendertag GitHub nach einer neueren Version.
+
+        Der HTTP-Call läuft in einem Daemon-Thread; alle State-Mutationen
+        (Settings-Write, Banner-Aufbau) werden via `root.after(0, ...)` auf
+        den UI-Thread marshallt, damit `Settings.set` nicht parallel zu
+        Schreibvorgängen aus dem Settings-Dialog läuft.
+
+        Fehler werden still verschluckt — Update-Hinweis ist nice-to-have.
+        """
+        if not should_check_today(self.settings.get("last_update_check_at")):
+            return
+
+        def worker():
+            try:
+                release = check_latest_release("MargenHeld/Zeiterfassung")
+                if release is None:
+                    return
+                newer = is_newer(VERSION, release.version)
+            except Exception:
+                # Pure Logik, robust gegen exotische Tags. Bei jedem Fehler:
+                # nichts persistieren, nichts anzeigen — morgen nochmal probieren.
+                return
+            self.root.after(
+                0, lambda: self._handle_update_check_result(release, newer)
+            )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _handle_update_check_result(self, release: "Release", newer: bool):
+        """Läuft im UI-Thread. Persistiert den Check-Stand und zeigt ggf. den Banner.
+
+        `is_newer` ist bereits im Worker ausgewertet, damit hier keine ungeschützte
+        Logik im Tk-Event-Loop läuft.
+        """
+        self.settings.set("last_update_check_at", today_iso())
+        if not newer:
+            return
+        if release.version == self.settings.get("dismissed_version"):
+            return
+        self._show_update_banner(release)
+
+    def _show_update_banner(self, release: "Release"):
+        if self._update_banner is not None:
+            return
+        self._update_banner = tk.Frame(self.root, bg=ACCENT)
+        self._update_banner.pack(
+            before=self.grid_frame, fill=tk.X, padx=10, pady=(5, 0),
+        )
+
+        tk.Label(
+            self._update_banner,
+            text=f"Version {release.version} verfügbar",
+            bg=ACCENT, fg="#ffffff", font=FONT_BOLD,
+        ).pack(side=tk.LEFT, padx=10, pady=6)
+
+        icon_button(
+            self._update_banner, "✕",
+            lambda: self._dismiss_update_banner(release.version),
+            fg="#ffffff", hover_fg=TEXT,
+        ).pack(side=tk.RIGHT, padx=(0, 6))
+
+        secondary_button(
+            self._update_banner, "Download",
+            lambda: self._open_update_download(release),
+            padx=12,
+        ).pack(side=tk.RIGHT, padx=6)
+
+    def _open_update_download(self, release: "Release"):
+        url = pick_asset_url(
+            release.assets, platform.system(), release.version,
+        ) or release.html_url
+        webbrowser.open(url)
+
+    def _dismiss_update_banner(self, version: str):
+        self.settings.set("dismissed_version", version)
+        if self._update_banner is not None:
+            self._update_banner.destroy()
+            self._update_banner = None
 
     def _build_header(self):
         frame = tk.Frame(self.root, bg=BG)
