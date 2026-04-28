@@ -123,15 +123,20 @@ def _proactive_update_check(self):
             return
         if release is None:
             return
-        self.settings.set("last_update_check_at", today_iso())
-        if not is_newer(VERSION, release.version):
-            return
-        if release.version == self.settings.get("dismissed_version"):
-            return
-        self.root.after(0, lambda: self._show_update_banner(release))
+        self.root.after(0, lambda: self._handle_update_check_result(release))
 
     threading.Thread(target=worker, daemon=True).start()
+
+def _handle_update_check_result(self, release: Release):
+    self.settings.set("last_update_check_at", today_iso())
+    if not is_newer(VERSION, release.version):
+        return
+    if release.version == self.settings.get("dismissed_version"):
+        return
+    self._show_update_banner(release)
 ```
+
+Begründung Marshal: `Settings.set` ist nicht thread-safe (kein Lock in `src/settings.py`). Der UI-Thread kann jederzeit über den Settings-Dialog schreiben — gleichzeitiger Worker-Write könnte die JSON-Datei korrumpieren. `root.after(0, ...)` schiebt die Settings-Mutation und den Banner-Aufbau zusammen auf den UI-Thread, der den State-Mutationen serialisiert. Der HTTP-Call selbst bleibt im Worker, damit der UI-Thread nicht blockiert.
 
 Reihenfolge in `__init__` (analog zur bestehenden Struktur):
 
@@ -200,11 +205,14 @@ Der Banner verwendet das bestehende Theme-Vokabular (`ACCENT`, `BG`, `TEXT`, `FO
 
 ### Lifecycle
 
-`_update_banner` wird in `__init__` als `None` initialisiert. Erst `_show_update_banner` legt das Frame an. Nach Dismiss → `destroy()` und zurück auf `None`. Ein zweiter Call von `_show_update_banner` während eines Sessions sollte nicht passieren (jeder Start prüft genau einmal), aber der Code darf keinen alten Frame liegen lassen — defensiver Check oben:
+`self._update_banner = None` in `__init__` (vor `_proactive_update_check`). Erst `_show_update_banner` legt das Frame an. Nach Dismiss → `destroy()` und zurück auf `None`. Ein zweiter Call sollte nicht passieren (jeder App-Start prüft genau einmal), aber `_show_update_banner` schützt sich defensiv als erste Zeile:
 
 ```python
-if getattr(self, "_update_banner", None) is not None:
-    return
+def _show_update_banner(self, release: Release):
+    if self._update_banner is not None:
+        return
+    self._update_banner = tk.Frame(self.root, bg=ACCENT)
+    # ... Aufbau wie oben
 ```
 
 ## Fehlerbehandlung
