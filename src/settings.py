@@ -15,6 +15,8 @@ DEFAULTS = {
     "mail_closing": "Mit freundlichen Grüßen",
     "hourly_rate": 0.0,
     "state": "",
+    "last_update_check_at": "",
+    "dismissed_version": "",
 }
 
 class Settings:

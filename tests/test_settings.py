@@ -39,3 +39,11 @@ def test_recipient_default(tmp_settings):
 
 def test_autostart_default(tmp_settings):
     assert tmp_settings.get("autostart") == False
+
+
+def test_last_update_check_at_default(tmp_settings):
+    assert tmp_settings.get("last_update_check_at") == ""
+
+
+def test_dismissed_version_default(tmp_settings):
+    assert tmp_settings.get("dismissed_version") == ""
