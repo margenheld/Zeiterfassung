@@ -14,7 +14,11 @@ from src.theme import (
     primary_button, secondary_button,
 )
 from src.holidays_de import STATES
+from src.settings import WEEKDAY_KEYS
 from src.time_utils import validate_entry
+
+
+WEEKDAY_LABELS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 
 
 def open_settings_dialog(parent, settings, base_path, on_change):
@@ -78,13 +82,27 @@ def open_settings_dialog(parent, settings, base_path, on_change):
     email_var = tk.StringVar(value=settings.get("email"))
     dark_entry(dialog, email_var, width=25).grid(row=2, column=1, padx=10, pady=8)
 
-    label("Standard-Start:", row=3)
-    start_var = tk.StringVar(value=settings.get("default_start"))
-    dark_combo(dialog, start_var, TIME_VALUES).grid(row=3, column=1, padx=10, pady=8)
+    label("Standardzeiten:", row=3, sticky="nw", pady=4)
 
-    label("Standard-Ende:", row=4)
-    end_var = tk.StringVar(value=settings.get("default_end"))
-    dark_combo(dialog, end_var, TIME_VALUES).grid(row=4, column=1, padx=10, pady=8)
+    times_frame = tk.Frame(dialog, bg=BG)
+    times_frame.grid(row=3, column=1, rowspan=2, padx=10, pady=4, sticky="w")
+
+    tk.Label(times_frame, text="Start", font=FONT_SMALL, bg=BG, fg=TEXT_MUTED).grid(
+        row=0, column=1, padx=2)
+    tk.Label(times_frame, text="Ende", font=FONT_SMALL, bg=BG, fg=TEXT_MUTED).grid(
+        row=0, column=2, padx=2)
+
+    start_vars = {}
+    end_vars = {}
+    for i, (key, lbl) in enumerate(zip(WEEKDAY_KEYS, WEEKDAY_LABELS), start=1):
+        tk.Label(times_frame, text=lbl, font=FONT, bg=BG, fg=TEXT, width=3, anchor="w").grid(
+            row=i, column=0, padx=(0, 8), pady=2)
+        start_vars[key] = tk.StringVar(value=settings.get(f"default_start_{key}"))
+        dark_combo(times_frame, start_vars[key], TIME_VALUES).grid(
+            row=i, column=1, padx=2, pady=2)
+        end_vars[key] = tk.StringVar(value=settings.get(f"default_end_{key}"))
+        dark_combo(times_frame, end_vars[key], TIME_VALUES).grid(
+            row=i, column=2, padx=2, pady=2)
 
     label("Standard-Pause (Min):", row=5)
     pause_var = tk.StringVar(value=str(settings.get("default_pause")))
@@ -154,10 +172,15 @@ def open_settings_dialog(parent, settings, base_path, on_change):
     ).grid(row=16, column=0, columnspan=2, padx=10, pady=8, sticky="w")
 
     def save_settings():
-        ok, msg = validate_entry(start_var.get(), end_var.get())
-        if not ok:
-            messagebox.showerror("Standard-Arbeitszeit ungültig", msg, parent=dialog)
-            return
+        for key, lbl in zip(WEEKDAY_KEYS, WEEKDAY_LABELS):
+            ok, msg = validate_entry(start_vars[key].get(), end_vars[key].get())
+            if not ok:
+                messagebox.showerror(
+                    "Standard-Arbeitszeit ungültig",
+                    f"{lbl}: {msg}",
+                    parent=dialog,
+                )
+                return
 
         new_autostart = autostart_var.get()
         old_autostart = settings.get("autostart")
@@ -191,11 +214,9 @@ def open_settings_dialog(parent, settings, base_path, on_change):
             "",
         )
 
-        settings.set_many({
+        updates = {
             "autostart": new_autostart,
             "email": email_var.get(),
-            "default_start": start_var.get(),
-            "default_end": end_var.get(),
             "default_pause": int(pause_var.get()),
             "recipient": recipient_var.get(),
             "name": name_var.get(),
@@ -205,7 +226,11 @@ def open_settings_dialog(parent, settings, base_path, on_change):
             "mail_closing": closing_text.get("1.0", "end-1c"),
             "hourly_rate": hourly_rate,
             "state": selected_code,
-        })
+        }
+        for key in WEEKDAY_KEYS:
+            updates[f"default_start_{key}"] = start_vars[key].get()
+            updates[f"default_end_{key}"] = end_vars[key].get()
+        settings.set_many(updates)
         on_change()
         dialog.destroy()
 
