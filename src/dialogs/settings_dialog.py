@@ -79,10 +79,25 @@ def open_settings_dialog(parent, settings, base_path, on_change):
     email_var = tk.StringVar(value=settings.get("email"))
     dark_entry(dialog, email_var, width=25).grid(row=2, column=1, padx=10, pady=8)
 
-    label("Standardzeiten:", row=3, sticky="nw", pady=4)
+    times_label = tk.Label(
+        dialog, text="Standardzeiten: ▶", font=FONT, bg=BG, fg=TEXT,
+        cursor="hand2",
+    )
+    times_label.grid(row=3, column=0, padx=10, pady=8, sticky="w")
 
     times_frame = tk.Frame(dialog, bg=BG)
     times_frame.grid(row=3, column=1, rowspan=2, padx=10, pady=4, sticky="w")
+    times_frame.grid_remove()  # default eingeklappt — User klappt bei Bedarf auf
+
+    def toggle_times(_event=None):
+        if times_frame.winfo_ismapped():
+            times_frame.grid_remove()
+            times_label.config(text="Standardzeiten: ▶")
+        else:
+            times_frame.grid()
+            times_label.config(text="Standardzeiten: ▼")
+
+    times_label.bind("<Button-1>", toggle_times)
 
     tk.Label(times_frame, text="Start", font=FONT_SMALL, bg=BG, fg=TEXT_MUTED).grid(
         row=0, column=1, padx=2)
