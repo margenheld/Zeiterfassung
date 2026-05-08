@@ -15,10 +15,7 @@ from src.theme import (
 )
 from src.holidays_de import STATES
 from src.settings import WEEKDAY_KEYS
-from src.time_utils import validate_entry
-
-
-WEEKDAY_LABELS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+from src.time_utils import DAYS_DE, validate_entry
 
 
 def open_settings_dialog(parent, settings, base_path, on_change):
@@ -94,7 +91,7 @@ def open_settings_dialog(parent, settings, base_path, on_change):
 
     start_vars = {}
     end_vars = {}
-    for i, (key, lbl) in enumerate(zip(WEEKDAY_KEYS, WEEKDAY_LABELS), start=1):
+    for i, (key, lbl) in enumerate(zip(WEEKDAY_KEYS, DAYS_DE), start=1):
         tk.Label(times_frame, text=lbl, font=FONT, bg=BG, fg=TEXT, width=3, anchor="w").grid(
             row=i, column=0, padx=(0, 8), pady=2)
         start_vars[key] = tk.StringVar(value=settings.get(f"default_start_{key}"))
@@ -104,6 +101,7 @@ def open_settings_dialog(parent, settings, base_path, on_change):
         dark_combo(times_frame, end_vars[key], TIME_VALUES).grid(
             row=i, column=2, padx=2, pady=2)
 
+    # Pause bleibt absichtlich global — Spec 2026-05-08, Out-of-Scope: Pause pro Wochentag.
     label("Standard-Pause (Min):", row=5)
     pause_var = tk.StringVar(value=str(settings.get("default_pause")))
     dark_combo(dialog, pause_var, PAUSE_VALUES).grid(row=5, column=1, padx=10, pady=8)
@@ -172,7 +170,7 @@ def open_settings_dialog(parent, settings, base_path, on_change):
     ).grid(row=16, column=0, columnspan=2, padx=10, pady=8, sticky="w")
 
     def save_settings():
-        for key, lbl in zip(WEEKDAY_KEYS, WEEKDAY_LABELS):
+        for key, lbl in zip(WEEKDAY_KEYS, DAYS_DE):
             ok, msg = validate_entry(start_vars[key].get(), end_vars[key].get())
             if not ok:
                 messagebox.showerror(
