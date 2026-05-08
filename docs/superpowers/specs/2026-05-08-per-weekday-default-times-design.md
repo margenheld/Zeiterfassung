@@ -58,7 +58,7 @@ WEEKDAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")  # Index = date
 
 ### Migration
 
-`Settings._load` bekommt einen Migrations-Pass **vor** der DEFAULTS-Loop. Wenn das geladene JSON noch alte globale Keys enthält und für einen Tag noch kein Per-Tag-Wert vorliegt, wird der globale Wert hochkopiert:
+`Settings._load` bekommt einen Migrations-Pass **direkt nach dem `isinstance(loaded, dict)`-Guard** (nach `settings.py:74`) und **vor** der DEFAULTS-Loop (vor `settings.py:76`). Wenn das geladene JSON noch alte globale Keys enthält und für einen Tag noch kein Per-Tag-Wert vorliegt, wird der globale Wert hochkopiert:
 
 ```python
 def _migrate_legacy_default_times(loaded):
@@ -99,13 +99,24 @@ dark_combo(dialog, end_var, TIME_VALUES).grid(row=4, column=1, padx=10, pady=8)
 Die zwei Zeilen werden durch einen Sub-Frame ersetzt, der alle 7 Wochentage als Tabelle zeigt:
 
 ```
-Standardzeiten:    Mo  [08:00 v]  [16:00 v]
+Standardzeiten:        Start         Ende
+                   Mo  [08:00 v]  [16:00 v]
                    Di  [08:00 v]  [16:00 v]
                    Mi  [08:00 v]  [16:00 v]
                    Do  [08:00 v]  [16:00 v]
                    Fr  [08:00 v]  [16:00 v]
                    Sa  [08:00 v]  [16:00 v]
                    So  [08:00 v]  [16:00 v]
+```
+
+Die Header-Zeile (`Start` / `Ende`) sitzt als kleines `FONT_SMALL`-Label oberhalb der jeweiligen Spalte — aus dem Skizze-Code unten ist das die `i=-1`-Zeile vor dem Hauptloop:
+
+```python
+tk.Label(times_frame, text="Start", font=FONT_SMALL, bg=BG, fg=TEXT_MUTED).grid(
+    row=0, column=1, padx=2)
+tk.Label(times_frame, text="Ende", font=FONT_SMALL, bg=BG, fg=TEXT_MUTED).grid(
+    row=0, column=2, padx=2)
+# Wochentags-Loop dann ab row=1.
 ```
 
 Skizze (gekürzt):
@@ -118,9 +129,14 @@ label("Standardzeiten:", row=3, sticky="nw", pady=4)
 times_frame = tk.Frame(dialog, bg=BG)
 times_frame.grid(row=3, column=1, padx=10, pady=4, sticky="w")
 
+tk.Label(times_frame, text="Start", font=FONT_SMALL, bg=BG, fg=TEXT_MUTED).grid(
+    row=0, column=1, padx=2)
+tk.Label(times_frame, text="Ende", font=FONT_SMALL, bg=BG, fg=TEXT_MUTED).grid(
+    row=0, column=2, padx=2)
+
 start_vars = {}
 end_vars = {}
-for i, (key, lbl) in enumerate(zip(WEEKDAY_KEYS, WEEKDAY_LABELS)):
+for i, (key, lbl) in enumerate(zip(WEEKDAY_KEYS, WEEKDAY_LABELS), start=1):
     tk.Label(times_frame, text=lbl, font=FONT, bg=BG, fg=TEXT, width=3, anchor="w").grid(
         row=i, column=0, padx=(0, 8), pady=2)
     start_vars[key] = tk.StringVar(value=settings.get(f"default_start_{key}"))
@@ -147,7 +163,9 @@ for key, lbl in zip(WEEKDAY_KEYS, WEEKDAY_LABELS):
         return
 ```
 
-Der bisherige Single-Validation-Block (Zeilen 156–160) wird durch obigen Loop ersetzt.
+Der bisherige Single-Validation-Block (Zeilen 157–160) wird durch obigen Loop ersetzt.
+
+**`default_pause` bleibt global.** Pause-Zeit wird _nicht_ pro Wochentag geführt (siehe Out-of-Scope). Der bestehende Pause-Combobox in Zeile 89–91 bleibt unverändert. Das hier ist eine bewusste Asymmetrie — vorzeitige Symmetrie wäre Over-Engineering.
 
 ### Persistierung
 
@@ -191,9 +209,13 @@ end_var = tk.StringVar(
 )
 ```
 
-`WEEKDAY_KEYS` wird aus `src.settings` importiert.
+`WEEKDAY_KEYS` wird aus `src.settings` importiert. `entry_dialog.py` importiert bisher nichts aus `src.settings` — es kommt also eine **neue** Import-Zeile dazu:
 
-`datetime` wird im Dialog bereits importiert (Zeile 1) — keine neuen Imports.
+```python
+from src.settings import WEEKDAY_KEYS
+```
+
+`datetime` wird im Dialog bereits importiert (Zeile 1).
 
 ## 4) Tests
 
@@ -205,6 +227,7 @@ Neue/geänderte Tests in `tests/test_settings.py`:
 | `test_old_default_start_end_no_longer_in_defaults` | `Settings.get("default_start")` / `default_end` liefert `None` (keine globalen Keys mehr) |
 | `test_migration_legacy_to_per_weekday` | `settings.json` mit `{"default_start": "09:30", "default_end": "17:00"}` → nach Load: alle 7 Tage haben `09:30` / `17:00` |
 | `test_migration_partial_legacy_only_start` | Nur `default_start` im JSON → alle 7 `default_start_*` migriert, `default_end_*` bleibt Default |
+| `test_migration_partial_legacy_only_end` | Symmetrischer Fall: nur `default_end` im JSON → alle 7 `default_end_*` migriert, `default_start_*` bleibt Default |
 | `test_migration_per_day_wins_over_legacy` | JSON mit `{"default_start": "09:00", "default_start_mon": "07:00"}` → `mon` bleibt `07:00`, andere Tage `09:00` |
 | `test_migration_drops_legacy_keys_on_save` | Nach Migration + irgendeinem `set_many` enthält `settings.json` keine `default_start` / `default_end` Keys mehr |
 
