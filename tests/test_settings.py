@@ -2,7 +2,7 @@ import json
 from unittest.mock import patch
 
 import pytest
-from src.settings import Settings
+from src.settings import Settings, WEEKDAY_KEYS
 
 @pytest.fixture
 def tmp_settings(tmp_path):
@@ -140,12 +140,10 @@ def test_load_toplevel_not_dict_resets_to_defaults(tmp_path, caplog):
 
 # --- Per-Wochentag-Defaults (1.10.0) ---
 
-WEEKDAY_SUFFIXES = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-
 
 def test_per_weekday_defaults_present(tmp_settings):
     """Frische Settings haben für alle 7 Tage je 08:00 / 16:00."""
-    for day in WEEKDAY_SUFFIXES:
+    for day in WEEKDAY_KEYS:
         assert tmp_settings.get(f"default_start_{day}") == "08:00"
         assert tmp_settings.get(f"default_end_{day}") == "16:00"
 
@@ -163,7 +161,7 @@ def test_migration_legacy_to_per_weekday(tmp_path):
         "default_end": "17:00",
     }))
     s = Settings(path)
-    for day in WEEKDAY_SUFFIXES:
+    for day in WEEKDAY_KEYS:
         assert s.get(f"default_start_{day}") == "09:30"
         assert s.get(f"default_end_{day}") == "17:00"
 
@@ -173,7 +171,7 @@ def test_migration_partial_legacy_only_start(tmp_path):
     default_end_* bleibt Default."""
     path = _write_json(tmp_path, json.dumps({"default_start": "07:15"}))
     s = Settings(path)
-    for day in WEEKDAY_SUFFIXES:
+    for day in WEEKDAY_KEYS:
         assert s.get(f"default_start_{day}") == "07:15"
         assert s.get(f"default_end_{day}") == "16:00"  # Default
 
@@ -182,7 +180,7 @@ def test_migration_partial_legacy_only_end(tmp_path):
     """Symmetrisch: nur default_end im JSON."""
     path = _write_json(tmp_path, json.dumps({"default_end": "18:30"}))
     s = Settings(path)
-    for day in WEEKDAY_SUFFIXES:
+    for day in WEEKDAY_KEYS:
         assert s.get(f"default_start_{day}") == "08:00"  # Default
         assert s.get(f"default_end_{day}") == "18:30"
 
@@ -215,3 +213,21 @@ def test_migration_drops_legacy_keys_on_save(tmp_path):
     # Per-Tag-Keys sind drin
     assert on_disk["default_start_mon"] == "09:30"
     assert on_disk["default_end_sun"] == "17:00"
+
+
+def test_migration_ignores_null_legacy(tmp_path):
+    """null im JSON wird nicht migriert — Defaults bleiben bestehen."""
+    path = _write_json(tmp_path, json.dumps({"default_start": None, "default_end": None}))
+    s = Settings(path)
+    for day in WEEKDAY_KEYS:
+        assert s.get(f"default_start_{day}") == "08:00"
+        assert s.get(f"default_end_{day}") == "16:00"
+
+
+def test_migration_empty_string_legacy_skipped(tmp_path):
+    """Leerer String wird nicht migriert."""
+    path = _write_json(tmp_path, json.dumps({"default_start": "", "default_end": ""}))
+    s = Settings(path)
+    for day in WEEKDAY_KEYS:
+        assert s.get(f"default_start_{day}") == "08:00"
+        assert s.get(f"default_end_{day}") == "16:00"

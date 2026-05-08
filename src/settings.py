@@ -66,15 +66,23 @@ def _migrate_legacy_default_times(loaded):
 
     Modifiziert `loaded` in-place. Per-Tag-Keys haben Priorität — wenn ein
     Tag schon einen Wert hat, wird er nicht überschrieben.
+
+    Nicht-strings (None, Zahlen) und leere Strings im Legacy-Feld werden
+    ignoriert, damit `_coerce` nichts in die Per-Tag-Keys gespiegelt bekommt,
+    was es dort nicht haben will.
     """
-    legacy_start = loaded.get("default_start")
-    legacy_end = loaded.get("default_end")
-    if not (legacy_start or legacy_end):
+    def _legacy(key):
+        value = loaded.get(key)
+        return value if isinstance(value, str) and value else None
+
+    legacy_start = _legacy("default_start")
+    legacy_end = _legacy("default_end")
+    if legacy_start is None and legacy_end is None:
         return
     for day in WEEKDAY_KEYS:
-        if legacy_start and f"default_start_{day}" not in loaded:
+        if legacy_start is not None and f"default_start_{day}" not in loaded:
             loaded[f"default_start_{day}"] = legacy_start
-        if legacy_end and f"default_end_{day}" not in loaded:
+        if legacy_end is not None and f"default_end_{day}" not in loaded:
             loaded[f"default_end_{day}"] = legacy_end
 
 
