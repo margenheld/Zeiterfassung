@@ -2,10 +2,10 @@ import json
 import logging
 import os
 
+WEEKDAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")  # Index = datetime.weekday()
+
 DEFAULTS = {
     "email": "",
-    "default_start": "08:00",
-    "default_end": "16:00",
     "default_pause": 30,
     "recipient": "",
     "autostart": False,
@@ -18,6 +18,20 @@ DEFAULTS = {
     "state": "",
     "last_update_check_at": "",
     "dismissed_version": "",
+    "default_start_mon": "08:00",
+    "default_start_tue": "08:00",
+    "default_start_wed": "08:00",
+    "default_start_thu": "08:00",
+    "default_start_fri": "08:00",
+    "default_start_sat": "08:00",
+    "default_start_sun": "08:00",
+    "default_end_mon": "16:00",
+    "default_end_tue": "16:00",
+    "default_end_wed": "16:00",
+    "default_end_thu": "16:00",
+    "default_end_fri": "16:00",
+    "default_end_sat": "16:00",
+    "default_end_sun": "16:00",
 }
 
 _COERCE_FAILED = object()
@@ -47,6 +61,23 @@ def _coerce(value, default):
     return _COERCE_FAILED
 
 
+def _migrate_legacy_default_times(loaded):
+    """Spiegelt alte globale default_start/default_end auf Per-Tag-Keys.
+
+    Modifiziert `loaded` in-place. Per-Tag-Keys haben Priorität — wenn ein
+    Tag schon einen Wert hat, wird er nicht überschrieben.
+    """
+    legacy_start = loaded.get("default_start")
+    legacy_end = loaded.get("default_end")
+    if not (legacy_start or legacy_end):
+        return
+    for day in WEEKDAY_KEYS:
+        if legacy_start and f"default_start_{day}" not in loaded:
+            loaded[f"default_start_{day}"] = legacy_start
+        if legacy_end and f"default_end_{day}" not in loaded:
+            loaded[f"default_end_{day}"] = legacy_end
+
+
 class Settings:
     def __init__(self, filepath="settings.json"):
         self.filepath = filepath
@@ -72,6 +103,8 @@ class Settings:
             )
             self._data = dict(DEFAULTS)
             return
+
+        _migrate_legacy_default_times(loaded)
 
         for key, default_value in DEFAULTS.items():
             if key not in loaded:
