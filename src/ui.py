@@ -163,7 +163,7 @@ class App:
             return
         self._update_banner = tk.Frame(self.root, bg=ACCENT)
         self._update_banner.pack(
-            before=self.grid_frame, fill=tk.X, padx=10, pady=(5, 0),
+            before=self.grid_container, fill=tk.X, padx=10, pady=(5, 0),
         )
 
         tk.Label(
@@ -234,8 +234,24 @@ class App:
         icon_button(frame, "\u203a", self._next).pack(side=tk.RIGHT, padx=(0, 5))
 
     def _build_grid(self):
-        self.grid_frame = tk.Frame(self.root, bg=BG)
-        self.grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # Double-Buffer: zwei dauerhafte Frames im selben Grid-Slot. Refresh
+        # baut in den inaktiven (versteckt unter dem aktiven), dann lift()
+        # tauscht atomar. So nie sichtbar leerer Hintergrund zwischen Destroy
+        # und Pack.
+        self.grid_container = tk.Frame(self.root, bg=BG)
+        self.grid_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self.grid_container.rowconfigure(0, weight=1)
+        self.grid_container.columnconfigure(0, weight=1)
+        self.grid_frames = []
+        for _ in range(2):
+            f = tk.Frame(self.grid_container, bg=BG)
+            f.grid(row=0, column=0, sticky="nsew")
+            for col in range(7):
+                f.columnconfigure(col, weight=1)
+            self.grid_frames.append(f)
+        self.grid_frames[0].lift()
+        self._active_grid_idx = 0
+        self.grid_frame = self.grid_frames[0]  # Alias auf aktiven Frame
 
     def _build_footer(self):
         footer_frame = tk.Frame(self.root, bg=BG)
@@ -315,9 +331,14 @@ class App:
                 text=get_week_label(self.iso_year, self.current_week)
             )
             self._refresh_week()
-        # Let tkinter compute the required size, then resize window
-        self.root.update_idletasks()
-        self.root.geometry("")
+        # Geometry nur beim First-Render und bei View-Wechsel neu setzen.
+        # Innerhalb derselben View ist die natürliche Größe seit Pad- und
+        # Minsize-Fix konstant; ein erneuter `geometry("")`-Aufruf triggert
+        # trotzdem einen WM-Repaint und erzeugt sichtbares Flackern.
+        if getattr(self, "_last_refresh_view", None) != self.view_mode:
+            self._last_refresh_view = self.view_mode
+            self.root.update_idletasks()
+            self.root.geometry("")
 
     def _build_grid_header(self, parent):
         for col, day_name in enumerate(DAYS_DE):
@@ -387,15 +408,23 @@ class App:
             parent, date_str, day_text, is_weekend, empty_height,
         )
 
-    def _swap_grid(self, new_frame):
-        for col in range(7):
-            new_frame.columnconfigure(col, weight=1)
-        self.grid_frame.destroy()
-        self.grid_frame = new_frame
-        self.grid_frame.pack(
-            fill=tk.BOTH, expand=True, padx=10, pady=5,
-            before=self.footer_label.master,
-        )
+    def _get_inactive_grid(self):
+        """Liefert das versteckte Grid-Frame (Double-Buffer-Backbuffer).
+        Children und Row-Config werden zurückgesetzt — Column-Config bleibt
+        (in `_build_grid` einmal gesetzt)."""
+        inactive = self.grid_frames[1 - self._active_grid_idx]
+        for child in list(inactive.winfo_children()):
+            child.destroy()
+        for row in range(8):
+            inactive.rowconfigure(row, minsize=0, weight=0)
+        return inactive
+
+    def _activate_grid(self, frame):
+        """Hebt das eben gefüllte Backbuffer-Frame nach vorne. Der bisherige
+        Front-Buffer bleibt als Backbuffer hinten — keine Destroy-Lücke."""
+        frame.lift()
+        self._active_grid_idx = 1 - self._active_grid_idx
+        self.grid_frame = frame
 
     def _update_footer(self, total_hours):
         rate = self.settings.get("hourly_rate") or 0
@@ -414,8 +443,9 @@ class App:
         )
 
     def _refresh_month(self):
-        # Build new grid off-screen, then swap to avoid flicker
-        new_frame = tk.Frame(self.root, bg=BG)
+        # In den versteckten Backbuffer bauen, dann via lift() in den Vordergrund
+        # holen — verhindert sichtbare leere Fläche zwischen Refreshes.
+        new_frame = self._get_inactive_grid()
         self._build_grid_header(new_frame)
 
         cal = calendar.Calendar(firstweekday=0)
@@ -425,7 +455,13 @@ class App:
         state = self.settings.get("state")
         holidays_map = get_holidays(state, self.year) if state else {}
 
-        for row, week in enumerate(cal.monthdayscalendar(self.year, self.month), start=1):
+        # Auf 6 Wochen padden, damit die Fensterhöhe zwischen Monaten konstant
+        # bleibt und `geometry("")` in `_refresh` keinen sichtbaren Resize auslöst.
+        weeks = cal.monthdayscalendar(self.year, self.month)
+        while len(weeks) < 6:
+            weeks.append([0] * 7)
+
+        for row, week in enumerate(weeks, start=1):
             for col, day in enumerate(week):
                 if day == 0:
                     tk.Label(new_frame, text="", bg=BG, relief=tk.FLAT).grid(
@@ -445,11 +481,22 @@ class App:
                 )
                 cell.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
 
-        self._swap_grid(new_frame)
+        # Konstante Reihenhöhe — sonst variiert die Fensterhöhe je nach Inhalt
+        # (Eintrags-/Feiertags-/Empty-Zellen sind unterschiedlich hoch, gepaddete
+        # Wochen ohne Content sind winzig). Probe = leere Zelle (height=3) ist
+        # die höchste Variante; minsize bringt alle Reihen auf dieses Maß.
+        probe = tk.Label(new_frame, text="", font=FONT, width=8, height=3)
+        probe.update_idletasks()
+        row_min_h = probe.winfo_reqheight() + 4  # +4 für pady=2 oben/unten
+        probe.destroy()
+        for row in range(1, 7):
+            new_frame.rowconfigure(row, minsize=row_min_h)
+
+        self._activate_grid(new_frame)
         self._update_footer(total_hours)
 
     def _refresh_week(self):
-        new_frame = tk.Frame(self.root, bg=BG)
+        new_frame = self._get_inactive_grid()
         self._build_grid_header(new_frame)
 
         dates = get_week_dates(self.iso_year, self.current_week)
@@ -485,7 +532,7 @@ class App:
             )
             cell.grid(row=1, column=col, sticky="nsew", padx=2, pady=2)
 
-        self._swap_grid(new_frame)
+        self._activate_grid(new_frame)
         self._update_footer(total_hours)
 
     @staticmethod
