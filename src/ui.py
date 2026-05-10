@@ -34,7 +34,7 @@ from src.theme import (
     BG, CELL_BG, WEEKEND_BG, ACCENT, ACCENT_HOVER, TEXT, TEXT_MUTED,
     ENTRY_BG, WEEKEND_ENTRY_BG, WEEKEND_FG,
     HOLIDAY_BG, HOLIDAY_BG_HOVER, HOLIDAY_ACCENT,
-    FONT, FONT_BOLD, FONT_HEADER, FONT_FOOTER, FONT_SMALL, FONT_TINY,
+    FONT, FONT_BOLD, FONT_HEADER, FONT_HEADER_SMALL, FONT_FOOTER, FONT_SMALL, FONT_TINY,
     CELL_BG_HOVER, WEEKEND_BG_HOVER, ENTRY_BG_HOVER, WEEKEND_ENTRY_BG_HOVER,
     icon_button, secondary_button, set_toggle_active, toggle_button,
 )
@@ -221,11 +221,12 @@ class App:
         )
         self.btn_week.pack(side=tk.LEFT)
 
-        # width fixiert reqwidth → kein Pack-Reflow, wenn sich der Monatsname
-        # zwischen kurzen ("Mai") und langen ("September") Varianten ändert.
-        # 16 deckt die längste Monat-Jahr-Kombination ("September 2026" = 14) ab.
+        # font und width werden in _refresh() je nach View gesetzt — fixe
+        # width verhindert Pack-Reflow beim Text-Wechsel innerhalb derselben
+        # View, und die Wochen-Variante braucht eine kleinere Schrift, weil
+        # das KW-Label sonst breiter als das Fenster ist.
         self.header_label = tk.Label(
-            frame, text="", font=FONT_HEADER, bg=BG, fg="#ffffff", width=16,
+            frame, text="", bg=BG, fg="#ffffff",
         )
         self.header_label.pack(side=tk.LEFT, expand=True)
 
@@ -330,11 +331,21 @@ class App:
 
     def _refresh(self):
         if self.view_mode == "month":
-            self.header_label.config(text=f"{MONTHS_DE[self.month]} {self.year}")
+            # FONT_HEADER (16pt) + width=16 — längste Variante "September 2026"
+            # (14 Zeichen) passt rein.
+            self.header_label.config(
+                text=f"{MONTHS_DE[self.month]} {self.year}",
+                font=FONT_HEADER, width=16,
+            )
             self._refresh_month()
         else:
+            # FONT_HEADER_SMALL (12pt) + width=32 — die längste Variante
+            # mit Jahreswechsel "KW 53 · 30.12.2025 – 05.01.2026" (31 Zeichen)
+            # passt in 16pt nicht ins Fenster (7 × Standardzelle), daher
+            # in der Wochenansicht kleinerer Header-Font.
             self.header_label.config(
-                text=get_week_label(self.iso_year, self.current_week)
+                text=get_week_label(self.iso_year, self.current_week),
+                font=FONT_HEADER_SMALL, width=32,
             )
             self._refresh_week()
         # Geometry nur beim First-Render und bei View-Wechsel neu setzen.
@@ -343,8 +354,30 @@ class App:
         # trotzdem einen WM-Repaint und erzeugt sichtbares Flackern.
         if getattr(self, "_last_refresh_view", None) != self.view_mode:
             self._last_refresh_view = self.view_mode
+            # Beim View-Wechsel hält der jetzt-inaktive Buffer noch den alten
+            # View (z.B. 6-Wochen-Monat während die Wochenansicht aktiv ist).
+            # Sein reqheight blockt `geometry("")`, das Fenster schrumpft erst
+            # beim nächsten Refresh (wenn der alte Buffer überschrieben wird).
+            # Deshalb hier explizit ausräumen.
+            # Inaktiv-Buffer komplett zurücksetzen — analog zu
+            # _get_inactive_grid. Children allein reicht NICHT: die
+            # `rowconfigure(minsize=...)` aus dem alten View bleibt sonst
+            # am Frame kleben und hält dessen reqheight auf Monats-Niveau,
+            # obwohl er leer ist → Container schrumpft nicht.
+            inactive = self.grid_frames[1 - self._active_grid_idx]
+            for child in list(inactive.winfo_children()):
+                child.destroy()
+            for row in range(8):
+                inactive.rowconfigure(row, minsize=0, weight=0)
             self.root.update_idletasks()
-            self.root.geometry("")
+            # Tk schrumpft Toplevels auf Windows nicht zuverlässig via
+            # `geometry("")` — explizit auf reqsize setzen erzwingt Resize.
+            # FIXME: schrumpft beim Monat→Woche-Wechsel die Höhe nicht
+            # vollständig auf Wochen-Niveau; erst der erste Wochenwechsel
+            # innerhalb der View korrigiert das. Workaround tolerierbar.
+            self.root.geometry(
+                f"{self.root.winfo_reqwidth()}x{self.root.winfo_reqheight()}"
+            )
 
     def _build_grid_header(self, parent):
         for col, day_name in enumerate(DAYS_DE):
