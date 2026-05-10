@@ -34,7 +34,7 @@ from src.theme import (
     BG, CELL_BG, WEEKEND_BG, ACCENT, ACCENT_HOVER, TEXT, TEXT_MUTED,
     ENTRY_BG, WEEKEND_ENTRY_BG, WEEKEND_FG,
     HOLIDAY_BG, HOLIDAY_BG_HOVER, HOLIDAY_ACCENT,
-    FONT, FONT_BOLD, FONT_HEADER, FONT_FOOTER, FONT_SMALL,
+    FONT, FONT_BOLD, FONT_HEADER, FONT_FOOTER, FONT_SMALL, FONT_TINY,
     CELL_BG_HOVER, WEEKEND_BG_HOVER, ENTRY_BG_HOVER, WEEKEND_ENTRY_BG_HOVER,
     icon_button, secondary_button, set_toggle_active, toggle_button,
 )
@@ -350,21 +350,29 @@ class App:
                 parent, text=day_name, font=FONT_BOLD, bg=BG, fg=fg,
             ).grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
 
-    def _build_entry_cell(self, parent, date_str, day_text, entry, is_weekend, pad):
+    def _build_entry_cell(self, parent, date_str, day_text, entry, is_weekend, pad, cell_size=None):
         bg = WEEKEND_ENTRY_BG if is_weekend else ENTRY_BG
         hover_bg = WEEKEND_ENTRY_BG_HOVER if is_weekend else ENTRY_BG_HOVER
         cell = tk.Frame(
             parent, bg=bg, relief=tk.SOLID,
             highlightbackground=ACCENT, highlightthickness=1, cursor="hand2",
         )
+        if cell_size is not None:
+            # Pixel-fixiert wie die Feiertagszelle — sonst weitet die Zeit-Zeile
+            # ("HH:MM-HH:MM" in FONT_SMALL) die Spalte auf und der Header-Reflow
+            # lässt den Monatsnamen flackern, sobald Einträge dazukommen.
+            cell.config(width=cell_size[0], height=cell_size[1])
+            cell.pack_propagate(False)
         day_lbl = tk.Label(
             cell, text=day_text, font=FONT,
             bg=bg, fg=TEXT, cursor="hand2",
         )
         day_lbl.pack(pady=(pad, 0))
+        # FONT_TINY (7pt) statt FONT_SMALL (8pt), damit "HH:MM-HH:MM" in die
+        # pixel-fixierte Standardzelle (width=8 in FONT) reinpasst.
         time_lbl = tk.Label(
             cell, text=f"{entry['start']}-{entry['end']}",
-            font=FONT_SMALL, bg=bg, fg=TEXT_MUTED, cursor="hand2",
+            font=FONT_TINY, bg=bg, fg=TEXT_MUTED, cursor="hand2",
         )
         time_lbl.pack(pady=(0, pad))
         for w in (cell, day_lbl, time_lbl):
@@ -390,12 +398,14 @@ class App:
 
     def _build_day_cell(self, parent, date_str, day_text, day_date, is_weekend,
                         entry, holidays_map, pad, empty_height,
-                        holiday_max_len, holiday_cell_size=None):
+                        holiday_max_len, holiday_cell_size=None,
+                        entry_cell_size=None):
         """Dispatcht auf Entry-, Holiday- oder Empty-Zelle und liefert die fertig
         konfigurierte Widget-Instanz. Caller grided das Ergebnis selbst."""
         if entry:
             cell = self._build_entry_cell(
                 parent, date_str, day_text, entry, is_weekend, pad,
+                cell_size=entry_cell_size,
             )
             if day_date in holidays_map:
                 attach_tooltip(cell, f"Feiertag: {holidays_map[day_date]}")
@@ -494,6 +504,7 @@ class App:
                     is_weekend=col >= 5, entry=entry, holidays_map=holidays_map,
                     pad=4, empty_height=3, holiday_max_len=12,
                     holiday_cell_size=cell_size,
+                    entry_cell_size=cell_size,
                 )
                 cell.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
 
@@ -538,6 +549,7 @@ class App:
                 is_weekend=col >= 5, entry=entry, holidays_map=holidays_map,
                 pad=8, empty_height=5, holiday_max_len=18,
                 holiday_cell_size=cell_size,
+                entry_cell_size=cell_size,
             )
             cell.grid(row=1, column=col, sticky="nsew", padx=2, pady=2)
 
