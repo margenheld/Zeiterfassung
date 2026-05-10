@@ -458,6 +458,18 @@ class App:
         state = self.settings.get("state")
         holidays_map = get_holidays(state, self.year) if state else {}
 
+        # Probe-Label, um die natürliche Pixel-Größe einer Standard-Tageszelle
+        # zu ermitteln. Wird genutzt für:
+        #  (a) Feiertagszellen pixel-fixieren — sonst weiten lange Feiertags-
+        #      namen die Spalte auf, das Grid wächst und der Header-Reflow
+        #      lässt den Monatsnamen flackern.
+        #  (b) konstante Reihenhöhe (minsize unten), damit gepaddete Wochen
+        #      ohne Content nicht zusammenklappen.
+        probe = tk.Label(new_frame, text="", font=FONT, width=8, height=3)
+        probe.update_idletasks()
+        cell_size = (probe.winfo_reqwidth(), probe.winfo_reqheight())
+        probe.destroy()
+
         # Auf 6 Wochen padden, damit die Fensterhöhe zwischen Monaten konstant
         # bleibt und `geometry("")` in `_refresh` keinen sichtbaren Resize auslöst.
         weeks = cal.monthdayscalendar(self.year, self.month)
@@ -481,17 +493,11 @@ class App:
                     new_frame, date_str, str(day), day_date,
                     is_weekend=col >= 5, entry=entry, holidays_map=holidays_map,
                     pad=4, empty_height=3, holiday_max_len=12,
+                    holiday_cell_size=cell_size,
                 )
                 cell.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
 
-        # Konstante Reihenhöhe — sonst variiert die Fensterhöhe je nach Inhalt
-        # (Eintrags-/Feiertags-/Empty-Zellen sind unterschiedlich hoch, gepaddete
-        # Wochen ohne Content sind winzig). Probe = leere Zelle (height=3) ist
-        # die höchste Variante; minsize bringt alle Reihen auf dieses Maß.
-        probe = tk.Label(new_frame, text="", font=FONT, width=8, height=3)
-        probe.update_idletasks()
-        row_min_h = probe.winfo_reqheight() + 4  # +4 für pady=2 oben/unten
-        probe.destroy()
+        row_min_h = cell_size[1] + 4  # +4 für pady=2 oben/unten
         for row in range(1, 7):
             new_frame.rowconfigure(row, minsize=row_min_h)
 
