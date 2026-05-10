@@ -221,8 +221,11 @@ class App:
         )
         self.btn_week.pack(side=tk.LEFT)
 
+        # width fixiert reqwidth → kein Pack-Reflow, wenn sich der Monatsname
+        # zwischen kurzen ("Mai") und langen ("September") Varianten ändert.
+        # 16 deckt die längste Monat-Jahr-Kombination ("September 2026" = 14) ab.
         self.header_label = tk.Label(
-            frame, text="", font=FONT_HEADER, bg=BG, fg="#ffffff",
+            frame, text="", font=FONT_HEADER, bg=BG, fg="#ffffff", width=16,
         )
         self.header_label.pack(side=tk.LEFT, expand=True)
 
