@@ -1,5 +1,6 @@
 # src/ui.py
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import messagebox
 import calendar
 import ctypes
@@ -308,16 +309,57 @@ class App:
 
     def _refresh(self):
         if self.view_mode == "month":
-            self.header_label.config(text=f"{MONTHS_DE[self.month]} {self.year}")
+            self.header_label.config(
+                text=f"{MONTHS_DE[self.month]} {self.year}",
+                font=FONT_HEADER,
+            )
             self._refresh_month()
         else:
             self.header_label.config(
                 text=get_week_label(self.iso_year, self.current_week)
             )
             self._refresh_week()
-        # Let tkinter compute the required size, then resize window
+            self._fit_week_header_font()
+        # Let tkinter compute the required size, then resize window.
+        # geometry("") shrinkt das Toplevel bei resizable(False) auf Windows
+        # nicht zuverlässig — daher reqwidth/reqheight explizit setzen.
         self.root.update_idletasks()
-        self.root.geometry("")
+        self.root.geometry(f"{self.root.winfo_reqwidth()}x{self.root.winfo_reqheight()}")
+
+    def _fit_week_header_font(self):
+        """Verkleinert die Wochen-Header-Font so weit nötig, damit das
+        Header-Frame nicht breiter wird als Grid oder Footer. Damit hat
+        das Window in Wochen- und Monatsansicht dieselbe Breite, auch wenn
+        die KW-Zeile (z.B. 'KW 52 · 28.12.2026 – 03.01.2027') viel länger
+        ist als 'September 2026'.
+
+        Das Sizing geschieht über ein Off-Screen-Probe-Label, damit der
+        sichtbare Header beim Iterieren nicht flackert.
+        """
+        self.root.update_idletasks()
+        target = max(
+            self.grid_frame.winfo_reqwidth(),
+            self.footer_label.master.winfo_reqwidth(),
+        )
+        header_frame = self.header_label.master
+        non_label_width = (
+            header_frame.winfo_reqwidth() - self.header_label.winfo_reqwidth()
+        )
+        available = target - non_label_width
+
+        family, weight = FONT_HEADER[0], FONT_HEADER[2]
+        text = self.header_label.cget("text")
+        probe = tk.Label(self.root, text=text)
+        sizes = (FONT_HEADER[1], 14, 13, 12, 11, 10, 9, 8)
+        chosen = sizes[-1]
+        for size in sizes:
+            probe.config(font=(family, size, weight))
+            probe.update_idletasks()
+            if probe.winfo_reqwidth() <= available:
+                chosen = size
+                break
+        probe.destroy()
+        self.header_label.config(font=(family, chosen, weight))
 
     def _build_grid_header(self, parent):
         for col, day_name in enumerate(DAYS_DE):
@@ -387,9 +429,15 @@ class App:
             parent, date_str, day_text, is_weekend, empty_height,
         )
 
-    def _swap_grid(self, new_frame):
+    def _swap_grid(self, new_frame, cell_min_width=None):
+        # uniform="day" + minsize sorgt dafür, dass alle 7 Spalten identisch breit
+        # sind und die Fensterbreite nicht von langen Feiertagsnamen oder Entry-
+        # Texten in einzelnen Spalten getrieben wird.
         for col in range(7):
-            new_frame.columnconfigure(col, weight=1)
+            kwargs = {"weight": 1, "uniform": "day"}
+            if cell_min_width is not None:
+                kwargs["minsize"] = cell_min_width
+            new_frame.columnconfigure(col, **kwargs)
         self.grid_frame.destroy()
         self.grid_frame = new_frame
         self.grid_frame.pack(
@@ -425,11 +473,30 @@ class App:
         state = self.settings.get("state")
         holidays_map = get_holidays(state, self.year) if state else {}
 
-        for row, week in enumerate(cal.monthdayscalendar(self.year, self.month), start=1):
+        cell_size = self._probe_cell_size(new_frame, height=3)
+        row_min_height = self._probe_entry_cell_height(new_frame, pad=4)
+
+        # Immer 6 Wochenreihen rendern, damit die Window-Höhe nicht zwischen
+        # Monaten mit 4/5/6 Wochen wackelt. Placeholder-Labels bekommen
+        # height=3 (FONT-Zeichen), passend zu empty-Day-Cells, damit die Row
+        # ihre Höhe behält auch in leeren Wochen.
+        # rowconfigure(minsize, uniform) garantiert, dass alle 6 Reihen
+        # gleich hoch sind, auch wenn nur manche Reihen Entry-Cells enthalten.
+        for r in range(1, 7):
+            new_frame.rowconfigure(
+                r, minsize=row_min_height, uniform="month-row",
+            )
+
+        weeks = cal.monthdayscalendar(self.year, self.month)
+        for row_idx in range(6):
+            week = weeks[row_idx] if row_idx < len(weeks) else [0] * 7
+            grid_row = row_idx + 1
             for col, day in enumerate(week):
                 if day == 0:
-                    tk.Label(new_frame, text="", bg=BG, relief=tk.FLAT).grid(
-                        row=row, column=col, sticky="nsew", padx=2, pady=2)
+                    tk.Label(
+                        new_frame, text="", bg=BG, relief=tk.FLAT,
+                        width=8, height=3,
+                    ).grid(row=grid_row, column=col, sticky="nsew", padx=2, pady=2)
                     continue
 
                 date_str = f"{self.year}-{self.month:02d}-{day:02d}"
@@ -442,10 +509,11 @@ class App:
                     new_frame, date_str, str(day), day_date,
                     is_weekend=col >= 5, entry=entry, holidays_map=holidays_map,
                     pad=4, empty_height=3, holiday_max_len=12,
+                    holiday_cell_size=cell_size,
                 )
-                cell.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
+                cell.grid(row=grid_row, column=col, sticky="nsew", padx=2, pady=2)
 
-        self._swap_grid(new_frame)
+        self._swap_grid(new_frame, cell_min_width=cell_size[0])
         self._update_footer(total_hours)
 
     def _refresh_week(self):
@@ -462,13 +530,7 @@ class App:
             for y in {dates[0].year, dates[-1].year}:
                 holidays_map.update(get_holidays(state, y))
 
-        # Probe-Label, um die natürliche Pixel-Größe einer Standard-Wochenzelle
-        # zu ermitteln. Holiday-Zellen werden auf diese Größe fixiert, damit
-        # längere Feiertagsnamen die Spalte nicht aufweiten.
-        probe = tk.Label(new_frame, text="", font=FONT, width=8, height=5)
-        probe.update_idletasks()
-        cell_size = (probe.winfo_reqwidth(), probe.winfo_reqheight())
-        probe.destroy()
+        cell_size = self._probe_cell_size(new_frame, height=5)
 
         for col, day_date in enumerate(dates):
             date_str = day_date.isoformat()
@@ -485,8 +547,42 @@ class App:
             )
             cell.grid(row=1, column=col, sticky="nsew", padx=2, pady=2)
 
-        self._swap_grid(new_frame)
+        self._swap_grid(new_frame, cell_min_width=cell_size[0])
         self._update_footer(total_hours)
+
+    @staticmethod
+    def _probe_cell_size(parent, height):
+        """Misst die natürliche Pixel-Größe einer Standard-Tageszelle
+        (text-free, FONT, width=8 chars). Wird genutzt, um Holiday-Zellen
+        auf eine feste Größe zu fixieren und allen Spalten dieselbe
+        Mindestbreite zu geben — damit Feiertagsnamen oder Entry-Texte
+        einzelne Spalten nicht aufweiten.
+
+        Kein update_idletasks: würde mid-refresh alle pending Änderungen
+        rendern (Header-Text-Update vor dem Grid-Swap) und Flicker erzeugen.
+        Tk berechnet winfo_reqwidth/reqheight für frisch erstellte Widgets
+        lazy on-demand auch ohne expliziten Flush.
+        """
+        probe = tk.Label(parent, text="", font=FONT, width=8, height=height)
+        size = (probe.winfo_reqwidth(), probe.winfo_reqheight())
+        probe.destroy()
+        return size
+
+    @staticmethod
+    def _probe_entry_cell_height(parent, pad):
+        """Misst die Pixel-Höhe einer typischen Eintragszelle (Day-Label +
+        Time-Label). Wird als rowconfigure(minsize=...) verwendet, damit
+        Reihen mit Entry-Cells (~3px höher als Empty-Cells) das Window-
+        Höhen-Verhalten nicht zwischen Monaten verschieben.
+
+        Kein update_idletasks (siehe _probe_cell_size).
+        """
+        cell = tk.Frame(parent, highlightthickness=1)
+        tk.Label(cell, text="00", font=FONT).pack(pady=(pad, 0))
+        tk.Label(cell, text="00:00-00:00", font=FONT_SMALL).pack(pady=(0, pad))
+        h = cell.winfo_reqheight()
+        cell.destroy()
+        return h
 
     @staticmethod
     def _truncate(text: str, max_len: int) -> str:
@@ -494,12 +590,31 @@ class App:
             return text
         return text[: max_len - 1] + "…"
 
+    @staticmethod
+    def _fit_text_to_pixels(text, font, max_width):
+        """Kürzt text mit '…' so weit, dass er in max_width Pixel passt.
+
+        Verwendet tkfont.Font.measure() statt einem Probe-Widget — pure
+        Font-Berechnung, kein widget-Lifecycle und kein update_idletasks
+        (das mid-refresh sichtbares Flicker verursachen würde, wenn pro
+        Holiday-Cell mehrfach iteriert wird).
+        """
+        f = tkfont.Font(font=font)
+        if f.measure(text) <= max_width:
+            return text
+        for cut in range(len(text) - 1, 0, -1):
+            candidate = text[:cut] + "…"
+            if f.measure(candidate) <= max_width:
+                return candidate
+        return "…"
+
     def _build_holiday_cell(self, parent, day_text, name, max_name_len, on_click, cell_size=None):
         """Grüne Feiertagszelle. Layout analog zur Eintragszelle.
 
         cell_size: optional (width_px, height_px). Wenn gesetzt, wird der Frame
         auf diese Pixel-Größe fixiert (verhindert Aufweitung der Spalte durch
-        längere Namen — relevant für die Wochenansicht).
+        längere Namen) und der Feiertagsname wird pixel-genau gekürzt, damit er
+        in eine Zeile passt.
         """
         cell = tk.Frame(
             parent, bg=HOLIDAY_BG, relief=tk.SOLID,
@@ -514,14 +629,16 @@ class App:
             bg=HOLIDAY_BG, fg=TEXT, cursor="hand2",
         )
         day_lbl.pack(pady=(4, 0))
-        truncated = self._truncate(name, max_name_len)
+        if cell_size is not None:
+            display_name = self._fit_text_to_pixels(
+                name, FONT_SMALL, cell_size[0] - 6,
+            )
+        else:
+            display_name = self._truncate(name, max_name_len)
         name_lbl = tk.Label(
-            cell, text=truncated,
+            cell, text=display_name,
             font=FONT_SMALL, bg=HOLIDAY_BG, fg=TEXT_MUTED, cursor="hand2",
         )
-        if cell_size is not None:
-            # Pixel-fixierte Zelle: Text bei Bedarf umbrechen, nicht horizontal überstehen.
-            name_lbl.config(wraplength=cell_size[0] - 6, justify="center")
         name_lbl.pack(pady=(0, 4))
 
         for w in (cell, day_lbl, name_lbl):
@@ -530,7 +647,7 @@ class App:
                 self._cell_hover(c, dl, nl, HOLIDAY_BG_HOVER))
             w.bind("<Leave>", lambda e, c=cell, dl=day_lbl, nl=name_lbl:
                 self._cell_hover(c, dl, nl, HOLIDAY_BG))
-        if truncated != name:
+        if display_name != name:
             # Nur am äußersten Frame binden, sonst gleichzeitige Tooltips, weil
             # Tk Enter-Events an Frame und Child unabhängig schickt.
             attach_tooltip(cell, name)
