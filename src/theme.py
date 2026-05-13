@@ -95,6 +95,59 @@ def dark_text(parent, width, height, **kw):
     )
 
 
+def label_button(
+    parent, text, command, *,
+    bg, fg, hover_bg, hover_fg,
+    font,
+    label_padx=0, label_pady=0,
+    width=None,
+):
+    """Frame+Label-Konstrukt als Button-Ersatz.
+
+    `tk.Button` ignoriert auf macOS bg/fg (Aqua-Backend zeichnet nativ).
+    `tk.Label` respektiert bg/fg auf allen Plattformen — daher Label
+    mit Klick-Bindings statt echtem Button.
+
+    Rückgabe: tk.Frame mit Attributen `_label` (inneres Label) und
+    `_colors` (dict mit bg/fg/hover_bg/hover_fg). set_toggle_active
+    mutiert `_colors`; die in dieser Funktion gesetzten Bindings lesen
+    daraus — kein Unbind nötig, attach_tooltip (add="+") bleibt
+    funktional.
+    """
+    frame = tk.Frame(parent, bg=bg, cursor="hand2")
+    label = tk.Label(
+        frame, text=text, font=font,
+        bg=bg, fg=fg, cursor="hand2",
+        width=width,
+    )
+    label.pack(padx=label_padx, pady=label_pady)
+    frame._label = label
+    frame._colors = {
+        "bg": bg, "fg": fg,
+        "hover_bg": hover_bg, "hover_fg": hover_fg,
+    }
+
+    def on_click(_e):
+        command()
+
+    def on_enter(_e):
+        c = frame._colors
+        frame.config(bg=c["hover_bg"])
+        label.config(bg=c["hover_bg"], fg=c["hover_fg"])
+
+    def on_leave(_e):
+        c = frame._colors
+        frame.config(bg=c["bg"])
+        label.config(bg=c["bg"], fg=c["fg"])
+
+    for w in (frame, label):
+        w.bind("<Button-1>", on_click)
+        w.bind("<Enter>", on_enter)
+        w.bind("<Leave>", on_leave)
+
+    return frame
+
+
 def primary_button(parent, text, command, **kw):
     kw.setdefault("font", FONT_BOLD)
     kw.setdefault("padx", 16)
