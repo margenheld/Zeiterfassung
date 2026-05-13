@@ -148,54 +148,59 @@ def label_button(
     return frame
 
 
-def primary_button(parent, text, command, **kw):
-    kw.setdefault("font", FONT_BOLD)
-    kw.setdefault("padx", 16)
-    kw.setdefault("pady", 4)
-    return tk.Button(
-        parent, text=text, command=command,
+def primary_button(parent, text, command, font=FONT_BOLD, padx=16, pady=4):
+    return label_button(
+        parent, text, command,
         bg=ACCENT, fg="#ffffff",
-        activebackground=ACCENT_HOVER, activeforeground="#ffffff",
-        relief=tk.FLAT, cursor="hand2", **kw,
+        hover_bg=ACCENT_HOVER, hover_fg="#ffffff",
+        font=font,
+        label_padx=padx, label_pady=pady,
     )
 
 
-def secondary_button(parent, text, command, **kw):
-    kw.setdefault("font", FONT)
-    kw.setdefault("padx", 16)
-    kw.setdefault("pady", 4)
-    return tk.Button(
-        parent, text=text, command=command,
+def secondary_button(parent, text, command, font=FONT, padx=16, pady=4):
+    return label_button(
+        parent, text, command,
         bg=CELL_BG, fg=TEXT,
-        activebackground=ENTRY_BG, activeforeground=TEXT,
-        relief=tk.FLAT, cursor="hand2", **kw,
+        hover_bg=ENTRY_BG, hover_fg=TEXT,
+        font=font,
+        label_padx=padx, label_pady=pady,
     )
 
 
-def toggle_button(parent, text, command, active=False, **kw):
+def toggle_button(parent, text, command, active=False):
     """Two-state segmented button used for the Monat/Woche switcher.
 
     Re-style with set_toggle_active(btn, bool) when state changes.
     """
-    btn = tk.Button(
-        parent, text=text, command=command,
-        font=FONT_SMALL, width=6, relief=tk.FLAT, cursor="hand2", **kw,
+    if active:
+        bg, fg, hover_bg, hover_fg = ACCENT, "#ffffff", ACCENT, "#ffffff"
+    else:
+        bg, fg, hover_bg, hover_fg = CELL_BG, TEXT_MUTED, ENTRY_BG, TEXT
+    return label_button(
+        parent, text, command,
+        bg=bg, fg=fg, hover_bg=hover_bg, hover_fg=hover_fg,
+        font=FONT_SMALL, width=6,
     )
-    set_toggle_active(btn, active)
-    return btn
 
 
 def set_toggle_active(btn, active):
+    """Mutiert die in `label_button` gesetzten `_colors`. Die Enter/Leave-
+    Handler lesen bei jedem Hover frisch daraus — kein Unbind nötig,
+    keine Closures mit alten Farben."""
     if active:
-        btn.config(
-            bg=ACCENT, fg="#ffffff",
-            activebackground=ACCENT, activeforeground="#ffffff",
-        )
+        btn._colors = {
+            "bg": ACCENT, "fg": "#ffffff",
+            "hover_bg": ACCENT, "hover_fg": "#ffffff",
+        }
     else:
-        btn.config(
-            bg=CELL_BG, fg=TEXT_MUTED,
-            activebackground=ENTRY_BG, activeforeground=TEXT,
-        )
+        btn._colors = {
+            "bg": CELL_BG, "fg": TEXT_MUTED,
+            "hover_bg": ENTRY_BG, "hover_fg": TEXT,
+        }
+    c = btn._colors
+    btn.config(bg=c["bg"])
+    btn._label.config(bg=c["bg"], fg=c["fg"])
 
 
 def center_dialog_on_parent(dialog, parent):
@@ -225,13 +230,14 @@ def center_dialog_on_parent(dialog, parent):
     dialog.geometry(f"+{x}+{y}")
 
 
-def icon_button(parent, text, command, fg=ACCENT, hover_fg=None, **kw):
+def icon_button(parent, text, command, fg=ACCENT, hover_fg=None):
     """Compact icon-style button used in the header (‹ › ⚙)."""
     if hover_fg is None:
         hover_fg = fg
-    return tk.Button(
-        parent, text=text, command=command, width=3,
-        font=FONT_BOLD, bg=CELL_BG, fg=fg,
-        activebackground=ENTRY_BG, activeforeground=hover_fg,
-        relief=tk.FLAT, cursor="hand2", **kw,
+    return label_button(
+        parent, text, command,
+        bg=CELL_BG, fg=fg,
+        hover_bg=ENTRY_BG, hover_fg=hover_fg,
+        font=FONT_BOLD,
+        width=3,
     )
