@@ -1,5 +1,14 @@
+import platform
 import tkinter as tk
 from tkinter import ttk
+
+_system = platform.system()
+if _system == "Darwin":
+    FONT_FAMILY = "Helvetica Neue"
+elif _system == "Linux":
+    FONT_FAMILY = "DejaVu Sans"
+else:
+    FONT_FAMILY = "Segoe UI"
 
 # Dark Modern color palette
 BG = "#1a1a2e"
@@ -14,13 +23,13 @@ ENTRY_BG = "#1a3a5c"
 WEEKEND_ENTRY_BG = "#1a3050"
 WEEKEND_FG = "#6c6c80"
 
-FONT = ("Segoe UI", 10)
-FONT_SMALL = ("Segoe UI", 8)
-FONT_TINY = ("Segoe UI", 7)
-FONT_BOLD = ("Segoe UI", 10, "bold")
-FONT_HEADER = ("Segoe UI", 16, "bold")
-FONT_HEADER_SMALL = ("Segoe UI", 12, "bold")
-FONT_FOOTER = ("Segoe UI", 12, "bold")
+FONT = (FONT_FAMILY, 10)
+FONT_SMALL = (FONT_FAMILY, 8)
+FONT_TINY = (FONT_FAMILY, 7)
+FONT_BOLD = (FONT_FAMILY, 10, "bold")
+FONT_HEADER = (FONT_FAMILY, 16, "bold")
+FONT_HEADER_SMALL = (FONT_FAMILY, 12, "bold")
+FONT_FOOTER = (FONT_FAMILY, 12, "bold")
 
 # Hover colors (slightly lighter variants)
 CELL_BG_HOVER = "#1e2d52"
