@@ -168,19 +168,28 @@ def secondary_button(parent, text, command, font=FONT, padx=16, pady=4):
     )
 
 
+def _toggle_colors(active):
+    if active:
+        # Aktive Toggle-Variante: kein Hover-Farbwechsel (würde wie "klickbar" aussehen)
+        return {
+            "bg": ACCENT, "fg": "#ffffff",
+            "hover_bg": ACCENT, "hover_fg": "#ffffff",
+        }
+    return {
+        "bg": CELL_BG, "fg": TEXT_MUTED,
+        "hover_bg": ENTRY_BG, "hover_fg": TEXT,
+    }
+
+
 def toggle_button(parent, text, command, active=False):
     """Two-state segmented button used for the Monat/Woche switcher.
 
     Re-style with set_toggle_active(btn, bool) when state changes.
     """
-    if active:
-        bg, fg, hover_bg, hover_fg = ACCENT, "#ffffff", ACCENT, "#ffffff"
-    else:
-        bg, fg, hover_bg, hover_fg = CELL_BG, TEXT_MUTED, ENTRY_BG, TEXT
     return label_button(
         parent, text, command,
-        bg=bg, fg=fg, hover_bg=hover_bg, hover_fg=hover_fg,
         font=FONT_SMALL, width=6,
+        **_toggle_colors(active),
     )
 
 
@@ -188,16 +197,7 @@ def set_toggle_active(btn, active):
     """Mutiert die in `label_button` gesetzten `_colors`. Die Enter/Leave-
     Handler lesen bei jedem Hover frisch daraus — kein Unbind nötig,
     keine Closures mit alten Farben."""
-    if active:
-        btn._colors = {
-            "bg": ACCENT, "fg": "#ffffff",
-            "hover_bg": ACCENT, "hover_fg": "#ffffff",
-        }
-    else:
-        btn._colors = {
-            "bg": CELL_BG, "fg": TEXT_MUTED,
-            "hover_bg": ENTRY_BG, "hover_fg": TEXT,
-        }
+    btn._colors = _toggle_colors(active)
     c = btn._colors
     btn.config(bg=c["bg"])
     btn._label.config(bg=c["bg"], fg=c["fg"])
