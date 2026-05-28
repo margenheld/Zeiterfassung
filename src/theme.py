@@ -77,17 +77,64 @@ def apply_combobox_style(dialog):
         bordercolor=TEXT_MUTED, lightcolor=CELL_BG, darkcolor=CELL_BG,
         selectbackground=ENTRY_BG, selectforeground=TEXT,
     )
+    # background MUSS für readonly explizit gemappt werden — sonst rendert
+    # clam den Pfeil-Button (Combobox.downarrow) im System-Default-Hell statt
+    # in CELL_BG. fieldbackground reicht nicht, weil das nur das Textfeld
+    # links färbt, nicht den Button rechts.
     style.map("Dark.TCombobox",
         fieldbackground=[("readonly", CELL_BG)],
+        background=[("readonly", CELL_BG), ("active", CELL_BG)],
         selectbackground=[("readonly", CELL_BG)],
         selectforeground=[("readonly", TEXT)],
         bordercolor=[("focus", ACCENT)],
+        arrowcolor=[("readonly", ACCENT), ("active", ACCENT)],
     )
+    # ComboboxPopdownFrame ist die ttk-Klasse des Frames innen im Popdown.
+    # background=CELL_BG sorgt dafür, dass keine helle System-Default-Fläche
+    # zwischen Listbox und Scrollbar durchblitzt.
+    style.configure(
+        "ComboboxPopdownFrame",
+        borderwidth=0, relief="flat",
+        background=CELL_BG,
+    )
+
+    # Der Popdown selbst ist ein Toplevel der Klasse ComboboxPopdown, der in
+    # combobox.tcl mit -borderwidth 1 -relief solid hardcoded ist. Die Farbe
+    # dieses Borders folgt der Toplevel-background. Per option_add auf die
+    # Klasse setzen wir background=ENTRY_BG → dezenter 1px-Rand statt heller
+    # Systemfarbe.
+    dialog.option_add("*ComboboxPopdown.background", ENTRY_BG)
+
+    # Listbox-Optionen können laut Tk-Doku NICHT per ttk.Style gesetzt werden,
+    # nur per option_add. selectBackground=ENTRY_BG (dezenter Hover) statt
+    # ACCENT — ttk::combobox bindet <Motion> so, dass die Selection mit der
+    # Maus wandert, „selected" und „hover" sind dadurch dasselbe. ACCENT war
+    # beim Scrollen zu aggressiv; ENTRY_BG passt zum Theme.
     dialog.option_add("*TCombobox*Listbox.background", CELL_BG)
     dialog.option_add("*TCombobox*Listbox.foreground", TEXT)
-    dialog.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
-    dialog.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
+    dialog.option_add("*TCombobox*Listbox.selectBackground", ENTRY_BG)
+    dialog.option_add("*TCombobox*Listbox.selectForeground", TEXT)
+    dialog.option_add("*TCombobox*Listbox.borderWidth", 0)
+    dialog.option_add("*TCombobox*Listbox.activeStyle", "none")
     dialog.option_add("*TCombobox*Listbox.font", FONT)
+
+    # Die Scrollbar im Combobox-Popdown ist eine ttk::scrollbar (kein legacy
+    # tk.Scrollbar) — daher greifen option_add-Properties nicht, nur ttk.Style.
+    # clam-Theme stylt die Vertical.TScrollbar über background/troughcolor/
+    # bordercolor/arrowcolor; lightcolor/darkcolor müssen mitgesetzt werden,
+    # sonst zeichnet clam einen 3D-Effekt mit hellen Highlights.
+    style.configure(
+        "Vertical.TScrollbar",
+        background=ENTRY_BG, troughcolor=CELL_BG,
+        bordercolor=CELL_BG, arrowcolor=TEXT_MUTED,
+        lightcolor=ENTRY_BG, darkcolor=ENTRY_BG,
+        gripcount=0,
+    )
+    style.map(
+        "Vertical.TScrollbar",
+        background=[("active", ACCENT), ("pressed", ACCENT)],
+        arrowcolor=[("active", TEXT), ("pressed", TEXT)],
+    )
 
 
 def dark_entry(parent, textvariable, width=25, **kw):
