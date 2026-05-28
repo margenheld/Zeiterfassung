@@ -37,7 +37,7 @@ from src.theme import (
     RESERVATION_ACCENT,
     FONT, FONT_BOLD, FONT_HEADER, FONT_HEADER_SMALL, FONT_FOOTER, FONT_SMALL, FONT_TINY,
     CELL_BG_HOVER, WEEKEND_BG_HOVER, ENTRY_BG_HOVER, WEEKEND_ENTRY_BG_HOVER,
-    apply_dark_titlebar, themed_askyesno,
+    apply_dark_titlebar, themed_askyesno, themed_showinfo,
     icon_button, label_button, secondary_button, set_toggle_active, toggle_button,
 )
 
@@ -126,7 +126,8 @@ class App:
                 )
             except TokenAuthError as e:
                 msg = str(e)
-                self.root.after(0, lambda: messagebox.showwarning(
+                self.root.after(0, lambda: themed_showinfo(
+                    self.root,
                     "Gmail-Anmeldung abgelaufen",
                     "Der Gmail-Token konnte nicht automatisch erneuert werden:\n\n"
                     f"{msg}\n\n"
@@ -137,8 +138,8 @@ class App:
             except Exception as e:
                 logging.getLogger(__name__).exception("Token-Refresh fehlgeschlagen")
                 err = f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
-                self.root.after(0, lambda: messagebox.showerror(
-                    "Token-Refresh fehlgeschlagen", err
+                self.root.after(0, lambda: themed_showinfo(
+                    self.root, "Token-Refresh fehlgeschlagen", err
                 ))
 
         threading.Thread(target=worker, daemon=True).start()
