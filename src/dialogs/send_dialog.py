@@ -11,7 +11,8 @@ from src.platform_open import open_folder
 from src.report import generate_pdf, generate_report
 from src.theme import (
     BG, FONT, TEXT,
-    apply_combobox_style, apply_dark_titlebar, center_dialog_on_parent,
+    apply_combobox_style, apply_dark_titlebar, attach_unfocus_on_click,
+    center_dialog_on_parent,
     dark_combo, primary_button, secondary_button, themed_showinfo,
 )
 
@@ -91,6 +92,7 @@ def open_send_dialog(parent, storage, settings, base_path):
     apply_dark_titlebar(dialog)
 
     apply_combobox_style(dialog)
+    attach_unfocus_on_click(dialog)
 
     today = datetime.date.today()
     from_default = _default_from_date(today)
