@@ -22,6 +22,7 @@ def show_missing_credentials_dialog(parent, base_path):
     dialog.title("Keine Zugangsdaten")
     dialog.resizable(False, False)
     dialog.grab_set()
+    dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
 
@@ -56,6 +57,7 @@ def show_missing_credentials_dialog(parent, base_path):
     primary_button(btn_frame, "Datenordner öffnen", open_and_close).pack(side=tk.LEFT, padx=5)
     secondary_button(btn_frame, "OK", dialog.destroy).pack(side=tk.LEFT, padx=5)
 
+    dialog.bind("<Escape>", lambda _e: dialog.destroy())
     center_dialog_on_parent(dialog, parent)
 
 
@@ -88,11 +90,13 @@ def open_send_dialog(parent, storage, settings, base_path):
     dialog.title("Zeitraum wählen")
     dialog.resizable(False, False)
     dialog.grab_set()
+    dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
 
     apply_combobox_style(dialog)
     attach_unfocus_on_click(dialog)
+    dialog.bind("<Escape>", lambda _e: dialog.destroy())
 
     today = datetime.date.today()
     from_default = _default_from_date(today)

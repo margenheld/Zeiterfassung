@@ -29,6 +29,8 @@ class ConflictsDialog:
         self.top.title("Konflikte auflösen")
         self.top.transient(parent)
         self.top.grab_set()
+        self.top.focus_set()
+        self.top.bind("<Escape>", lambda _e: self.top.destroy())
 
         self._build()
         self._refresh_list()

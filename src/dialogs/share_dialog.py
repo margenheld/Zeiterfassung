@@ -37,9 +37,11 @@ def open_share_dialog(parent, storage, settings, base_path):
     dialog.title("Arbeitszeiten teilen")
     dialog.resizable(False, False)
     dialog.grab_set()
+    dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
     attach_unfocus_on_click(dialog)
+    dialog.bind("<Escape>", lambda _e: dialog.destroy())
 
     tk.Label(
         dialog,

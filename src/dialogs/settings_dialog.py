@@ -33,6 +33,7 @@ def open_settings_dialog(parent, settings, base_path, on_change, *,
     dialog.title("Einstellungen")
     dialog.resizable(False, False)
     dialog.grab_set()
+    dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
 
@@ -673,6 +674,7 @@ def open_settings_dialog(parent, settings, base_path, on_change, *,
     secondary_button(btn_frame, "Abbrechen", dialog.destroy).pack(side=tk.LEFT, padx=5)
 
     attach_unfocus_on_click(dialog)
+    dialog.bind("<Escape>", lambda _e: dialog.destroy())
     # Mail-Vorlage default eingeklappt — spart Höhe, der Block wird selten
     # geändert. Funktioniert vor dem Mapping, weil der Toggle-Helper
     # winfo_manager() (mapping-unabhängig) statt winfo_ismapped() nutzt.

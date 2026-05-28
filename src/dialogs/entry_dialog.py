@@ -53,10 +53,15 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change,
     dialog.title(date_str)
     dialog.resizable(False, False)
     dialog.grab_set()
+    # focus_set() ist nach grab_set() Pflicht, sonst bleibt der Keyboard-
+    # Fokus auf dem Hauptfenster und Tastatur-Bindungen (z.B. Escape) am
+    # Dialog feuern nie. grab_set steuert nur Mouse-Events.
+    dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
     apply_combobox_style(dialog)
     attach_unfocus_on_click(dialog)
+    dialog.bind("<Escape>", lambda _e: dialog.destroy())
 
     # --- Ist-Zeit ---
     tk.Label(dialog, text="Start:", font=FONT, bg=BG, fg=TEXT).grid(

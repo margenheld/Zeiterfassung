@@ -83,10 +83,12 @@ class _ImportSummaryDialog:
         self.top.title("Arbeitszeiten importieren")
         self.top.resizable(False, False)
         self.top.grab_set()
+        self.top.focus_set()
         self.top.configure(bg=BG)
         apply_dark_titlebar(self.top)
         apply_combobox_style(self.top)
         attach_unfocus_on_click(self.top)
+        self.top.bind("<Escape>", lambda _e: self.top.destroy())
 
         self._build()
         center_dialog_on_parent(self.top, parent)
@@ -318,8 +320,10 @@ class _PerDayDialog:
         self.top.title("Pro Tag entscheiden")
         self.top.transient(parent)
         self.top.grab_set()
+        self.top.focus_set()
         self.top.configure(bg=BG)
         apply_dark_titlebar(self.top)
+        self.top.bind("<Escape>", lambda _e: self.top.destroy())
 
         self._build()
         center_dialog_on_parent(self.top, parent)

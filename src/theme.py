@@ -493,6 +493,7 @@ def themed_askyesno(parent, title: str, message: str) -> bool:
     dialog.resizable(False, False)
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    dialog.focus_set()
 
     result = {"value": False}
 
@@ -534,6 +535,7 @@ def themed_showinfo(parent, title: str, message: str) -> None:
     dialog.resizable(False, False)
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    dialog.focus_set()
 
     tk.Label(
         dialog, text=message, font=FONT, bg=BG, fg=TEXT,
