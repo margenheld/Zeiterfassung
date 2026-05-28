@@ -16,8 +16,8 @@ from src.share import (
 )
 from src.theme import (
     BG, CELL_BG, FONT, FONT_SMALL, TEXT, TEXT_MUTED,
-    apply_combobox_style, apply_dark_titlebar, attach_unfocus_on_click,
-    center_dialog_on_parent,
+    apply_app_icon, apply_combobox_style, apply_dark_titlebar,
+    attach_unfocus_on_click, center_dialog_on_parent,
     dark_combo, primary_button, secondary_button, themed_showinfo,
 )
 
@@ -86,6 +86,7 @@ class _ImportSummaryDialog:
         self.top.focus_set()
         self.top.configure(bg=BG)
         apply_dark_titlebar(self.top)
+        apply_app_icon(self.top)
         apply_combobox_style(self.top)
         attach_unfocus_on_click(self.top)
         self.top.bind("<Escape>", lambda _e: self.top.destroy())
@@ -323,6 +324,7 @@ class _PerDayDialog:
         self.top.focus_set()
         self.top.configure(bg=BG)
         apply_dark_titlebar(self.top)
+        apply_app_icon(self.top)
         self.top.bind("<Escape>", lambda _e: self.top.destroy())
 
         self._build()

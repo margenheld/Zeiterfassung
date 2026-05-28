@@ -64,7 +64,11 @@ class App:
         ico_path = os.path.join(base_path, "assets", "margenheld-icon.ico")
         png_path = os.path.join(base_path, "assets", "margenheld-icon.png")
         if platform.system() == "Windows" and os.path.exists(ico_path):
-            self.root.iconbitmap(ico_path)
+            # default=ico_path → `wm iconbitmap -default` setzt das
+            # App-weite Default-Icon im Tk-Interpreter. Muss auf root
+            # gesetzt werden, damit künftige Toplevels (Settings, Entry,
+            # …) das Icon erben statt das Tk-Default-Feder-Icon zu zeigen.
+            self.root.iconbitmap(default=ico_path)
         if os.path.exists(png_path):
             icon = tk.PhotoImage(file=png_path)
             self.root.iconphoto(True, icon)

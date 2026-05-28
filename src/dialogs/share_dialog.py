@@ -11,7 +11,8 @@ from src.mail import get_gmail_service, is_offline_error, send_email
 from src.share import build_share_doc, serialize_share_doc
 from src.theme import (
     BG, FONT, TEXT,
-    apply_dark_titlebar, attach_unfocus_on_click, center_dialog_on_parent,
+    apply_app_icon, apply_dark_titlebar, attach_unfocus_on_click,
+    center_dialog_on_parent,
     dark_entry, primary_button, secondary_button, themed_showinfo,
 )
 
@@ -40,6 +41,7 @@ def open_share_dialog(parent, storage, settings, base_path):
     dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    apply_app_icon(dialog)
     attach_unfocus_on_click(dialog)
     dialog.bind("<Escape>", lambda _e: dialog.destroy())
 

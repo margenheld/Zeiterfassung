@@ -1,7 +1,10 @@
+import os
 import platform
 import tkinter as tk
 from tkinter import ttk
 from typing import TypedDict
+
+from src.paths import get_base_path
 
 _system = platform.system()
 if _system == "Darwin":
@@ -410,6 +413,41 @@ def _hex_to_colorref(hex_color: str) -> int:
     return (b << 16) | (g << 8) | r
 
 
+_app_icon_ref: tk.PhotoImage | None = None
+
+
+def apply_app_icon(window):
+    """Setzt das App-Icon (margenheld-icon) auf einen Toplevel.
+
+    iconphoto(default=True) auf dem Root-Window vererbt das Icon auf Windows
+    nicht zuverlässig auf neue Toplevels — die zeigen dann das Tk-Default-
+    Feder-Icon in der Taskbar/Titelleiste. Daher pro Toplevel explizit:
+    auf Windows iconbitmap (.ico, multi-resolution → Taskbar scharf), auf
+    allen Plattformen zusätzlich iconphoto (PNG, Title-Bar in Tk).
+
+    Referenz auf das PhotoImage wird modul-global gehalten — Tk löscht das
+    Bild sonst per GC, sobald die lokale Variable aus dem Scope fällt, und
+    der Icon-Slot wird leer.
+    """
+    # Windows: nichts tun. Das App-weite Default-Icon wird einmal in ui.py
+    # via root.iconbitmap(default=ico_path) gesetzt; alle Toplevels erben
+    # es und Windows rendert die ICO multi-resolution sauber. Ein
+    # zusätzliches iconphoto(.png) würde das ICO überschreiben mit einem
+    # PNG-Render, das anders aussieht (Rand, Anti-Aliasing).
+    if platform.system() == "Windows":
+        return
+    global _app_icon_ref
+    base = get_base_path()
+    png_path = os.path.join(base, "assets", "margenheld-icon.png")
+    if os.path.exists(png_path):
+        try:
+            if _app_icon_ref is None:
+                _app_icon_ref = tk.PhotoImage(file=png_path)
+            window.iconphoto(False, _app_icon_ref)
+        except tk.TclError:
+            pass
+
+
 def apply_dark_titlebar(window):
     """Färbt auf Windows 11 (22H2+) die Titelleiste in den App-Theme-Farben.
 
@@ -493,6 +531,7 @@ def themed_askyesno(parent, title: str, message: str) -> bool:
     dialog.resizable(False, False)
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    apply_app_icon(dialog)
     dialog.focus_set()
 
     result = {"value": False}
@@ -535,6 +574,7 @@ def themed_showinfo(parent, title: str, message: str) -> None:
     dialog.resizable(False, False)
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    apply_app_icon(dialog)
     dialog.focus_set()
 
     tk.Label(
