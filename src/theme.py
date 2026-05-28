@@ -519,6 +519,78 @@ def _apply_dark_titlebar_now(window):
         pass
 
 
+def disable_min_max(window):
+    """Entfernt Minimize- und Maximize-Buttons aus der Titelleiste eines
+    Modal-Dialogs auf Windows.
+
+    Wichtig: Windows rendert Min und Max als Paar — wenn einer fehlt, wird
+    der andere ausgegraut angezeigt statt versteckt. Nur wenn BEIDE
+    (WS_MAXIMIZEBOX + WS_MINIMIZEBOX) aus dem Window-Style entfernt sind,
+    zeigt die Titelleiste nur den Close-Button (Modal-typisch).
+
+    Plattform-Verhalten:
+      - macOS: `resizable(False, False)` deaktiviert die Traffic-Light-
+        Buttons (grün/gelb) bereits — kein Win32-Pendant nötig.
+      - Linux: `transient(parent)` führt bei den meisten WMs (GNOME/KDE/
+        Mutter) dazu, dass kein Min/Max gerendert wird.
+
+    Daher Windows-only. Deferred via after(100, …) wie apply_dark_titlebar.
+    """
+    if platform.system() != "Windows":
+        return
+    window.after(100, lambda: _disable_min_max_now(window))
+
+
+def _disable_min_max_now(window):
+    try:
+        import ctypes
+        from ctypes import wintypes
+        u32 = ctypes.windll.user32
+        GWL_STYLE = -16
+        WS_MAXIMIZEBOX = 0x00010000
+        WS_MINIMIZEBOX = 0x00020000
+        GA_ROOT = 2
+
+        # argtypes/restype explizit — sonst returnt ctypes Pointer als c_int
+        # (32 Bit), HWNDs auf 64-Bit-Windows werden truncated → GetAncestor
+        # liefert ungültigen Handle → Style-Modifikation läuft ins Leere.
+        u32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+        u32.GetAncestor.restype = wintypes.HWND
+        # GWL_STYLE-Wert ist ein LONG (32-bit), aber der HWND-Parameter
+        # muss als HWND deklariert sein, nicht als c_int.
+        try:
+            get_long = u32.GetWindowLongPtrW
+            set_long = u32.SetWindowLongPtrW
+            get_long.argtypes = [wintypes.HWND, ctypes.c_int]
+            get_long.restype = ctypes.c_ssize_t
+            set_long.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+            set_long.restype = ctypes.c_ssize_t
+        except AttributeError:
+            get_long = u32.GetWindowLongW
+            set_long = u32.SetWindowLongW
+            get_long.argtypes = [wintypes.HWND, ctypes.c_int]
+            get_long.restype = wintypes.LONG
+            set_long.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LONG]
+            set_long.restype = wintypes.LONG
+
+        u32.SetWindowPos.argtypes = [
+            wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+            ctypes.c_int, ctypes.c_int, wintypes.UINT,
+        ]
+        u32.SetWindowPos.restype = wintypes.BOOL
+
+        wid = window.winfo_id()
+        hwnd = u32.GetAncestor(wid, GA_ROOT) or wid
+        style = get_long(hwnd, GWL_STYLE)
+        set_long(hwnd, GWL_STYLE, style & ~(WS_MAXIMIZEBOX | WS_MINIMIZEBOX))
+
+        SWP_NOSIZE, SWP_NOMOVE, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED = 0x1, 0x2, 0x4, 0x10, 0x20
+        u32.SetWindowPos(hwnd, 0, 0, 0, 0, 0,
+            SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+    except Exception:
+        pass
+
+
 def themed_askyesno(parent, title: str, message: str) -> bool:
     """Modaler Ja/Nein-Dialog im App-Theme. Drop-in für `messagebox.askyesno`.
 
@@ -531,6 +603,7 @@ def themed_askyesno(parent, title: str, message: str) -> bool:
     dialog.resizable(False, False)
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    disable_min_max(dialog)
     apply_app_icon(dialog)
     dialog.focus_set()
 
@@ -574,6 +647,7 @@ def themed_showinfo(parent, title: str, message: str) -> None:
     dialog.resizable(False, False)
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    disable_min_max(dialog)
     apply_app_icon(dialog)
     dialog.focus_set()
 

@@ -13,7 +13,7 @@ from src.theme import (
     PAUSE_VALUES, STATUS_OK, TEXT, TEXT_MUTED, TIME_VALUES,
     apply_app_icon, apply_combobox_style, apply_dark_titlebar,
     attach_unfocus_on_click,
-    center_dialog_on_parent,
+    center_dialog_on_parent, disable_min_max,
     dark_combo, dark_entry, dark_text,
     primary_button, secondary_button,
 )
@@ -37,6 +37,7 @@ def open_settings_dialog(parent, settings, base_path, on_change, *,
     dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    disable_min_max(dialog)
     apply_app_icon(dialog)
 
     apply_combobox_style(dialog)

@@ -7,7 +7,7 @@ from src.settings import WEEKDAY_KEYS
 from src.theme import (
     BG, FONT, FONT_BOLD, PAUSE_VALUES, TEXT, TEXT_MUTED, TIME_VALUES,
     apply_app_icon, apply_combobox_style, apply_dark_titlebar,
-    attach_unfocus_on_click, center_dialog_on_parent,
+    attach_unfocus_on_click, center_dialog_on_parent, disable_min_max,
     dark_combo, primary_button, secondary_button, themed_askyesno,
 )
 from src.time_utils import validate_entry
@@ -59,6 +59,7 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change,
     dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    disable_min_max(dialog)
     apply_app_icon(dialog)
     apply_combobox_style(dialog)
     attach_unfocus_on_click(dialog)

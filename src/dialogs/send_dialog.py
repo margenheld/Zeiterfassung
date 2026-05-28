@@ -12,7 +12,7 @@ from src.report import generate_pdf, generate_report
 from src.theme import (
     BG, FONT, TEXT,
     apply_app_icon, apply_combobox_style, apply_dark_titlebar,
-    attach_unfocus_on_click, center_dialog_on_parent,
+    attach_unfocus_on_click, center_dialog_on_parent, disable_min_max,
     dark_combo, primary_button, secondary_button, themed_showinfo,
 )
 
@@ -25,6 +25,7 @@ def show_missing_credentials_dialog(parent, base_path):
     dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    disable_min_max(dialog)
     apply_app_icon(dialog)
 
     tk.Label(
@@ -94,6 +95,7 @@ def open_send_dialog(parent, storage, settings, base_path):
     dialog.focus_set()
     dialog.configure(bg=BG)
     apply_dark_titlebar(dialog)
+    disable_min_max(dialog)
     apply_app_icon(dialog)
 
     apply_combobox_style(dialog)
