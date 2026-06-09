@@ -588,36 +588,7 @@ def test_merge_no_suppression_when_remote_present():
 
 # --- Kompaktierungs-Helfer ---
 
-from src.sync import compact_doc, compact_local, _remote_is_pre_v2
-
-
-def test_compact_doc_sets_watermark_and_strips():
-    now = "2026-06-09T12:00:00Z"
-    doc = _meta_doc(
-        entries={
-            "DEL": _e(None, None, None, "2026-05-05T00:00:00Z", deleted=True),
-            "LIVE": _e("08:00", "16:00", 30, "2026-05-05T00:00:00Z"),
-        },
-        conflicts=[_conflict("c-1", resolved=True, resolution={"start": "08:00"},
-                             resolved_at="2026-05-05T00:00:00Z", resolved_by="A")],
-        watermark="",
-    )
-    out = compact_doc(doc, now)
-    assert out["meta"]["gc_watermark"] == now
-    assert "DEL" not in out["entries"]
-    assert "LIVE" in out["entries"]
-    assert out["conflicts"] == []
-    # pure: Original unverändert
-    assert "DEL" in doc["entries"]
-
-
-def test_compact_doc_idempotent_second_run_is_clean_noop_but_advances_watermark():
-    out1 = compact_doc(_meta_doc(
-        entries={"DEL": _e(None, None, None, "2026-05-05T00:00:00Z", deleted=True)},
-        watermark=""), "2026-06-09T12:00:00Z")
-    out2 = compact_doc(out1, "2026-06-10T12:00:00Z")
-    assert out2["entries"] == {}
-    assert out2["meta"]["gc_watermark"] == "2026-06-10T12:00:00Z"
+from src.sync import compact_local, _remote_is_pre_v2
 
 
 def test_compact_local_strips_stores_and_sets_watermark(tmp_path):

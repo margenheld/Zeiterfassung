@@ -254,28 +254,6 @@ def apply_merged_doc(merged_doc, storage, settings, conflicts_store):
     settings.set("gc_watermark", (merged_doc.get("meta") or {}).get("gc_watermark") or "")
 
 
-def compact_doc(doc, now):
-    """Pure: liefert eine Kopie von `doc` mit gesetztem gc_watermark=now und
-    entfernten settled Tombstones (deleted-Einträge + resolved Konflikte mit
-    Zeit < now). Mutiert `doc` nicht.
-
-    Setzt ein v2-fähiges Doc voraus (Caller guarded mit `_remote_is_pre_v2`);
-    `compact_doc` re-stempelt SCHEMA_VERSION bedingungslos."""
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "entries": {
-            k: v for k, v in doc.get("entries", {}).items()
-            if not _is_settled_entry(v, now)
-        },
-        "settings": dict(doc.get("settings", {})),
-        "conflicts": [
-            c for c in doc.get("conflicts", [])
-            if not _is_settled_conflict(c, now)
-        ],
-        "meta": {"gc_watermark": now},
-    }
-
-
 def compact_local(storage, settings, conflicts_store, now):
     """Schreibt das gc_watermark lokal und strippt settled Tombstones aus
     Storage und ConflictsStore. Ein lokaler Schreibvorgang pro Store
