@@ -14,7 +14,11 @@ import datetime
 import uuid
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+
+def _watermark_of(doc):
+    return ((doc.get("meta") or {}).get("gc_watermark") or "")
 
 SYNCED_SETTING_KEYS = (
     "recipient", "name", "hourly_rate",
@@ -125,7 +129,10 @@ def merge(local, remote, last_pull_at):
         "entries": {},
         "settings": {},
         "conflicts": [],
+        "meta": {"gc_watermark": ""},
     }
+    watermark = max(_watermark_of(local), _watermark_of(remote))
+    merged["meta"]["gc_watermark"] = watermark
     new_conflicts = []
 
     # Entries
@@ -207,6 +214,7 @@ def build_local_doc(storage, settings, conflicts_store):
         "entries": storage.get_all_raw(),
         "settings": settings.get_synced_doc(),
         "conflicts": conflicts_store.get_all(),
+        "meta": {"gc_watermark": settings.get("gc_watermark") or ""},
     }
 
 
@@ -215,6 +223,7 @@ def apply_merged_doc(merged_doc, storage, settings, conflicts_store):
     storage.apply_merge(merged_doc.get("entries", {}))
     settings.apply_synced(merged_doc.get("settings", {}))
     conflicts_store.save_all(merged_doc.get("conflicts", []))
+    settings.set("gc_watermark", (merged_doc.get("meta") or {}).get("gc_watermark") or "")
 
 
 def resolve_conflict(conflict_id, chosen_value, conflicts_store, storage, settings, device_id):

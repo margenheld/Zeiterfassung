@@ -285,7 +285,7 @@ def test_build_local_doc_includes_storage_settings_conflicts(tmp_path):
     assert "2026-05-14" in doc["entries"]
     assert doc["settings"]["recipient"]["value"] == "a@b.de"
     assert doc["conflicts"][0]["id"] == "c-1"
-    assert doc["schema_version"] == 1
+    assert doc["schema_version"] == 2
 
 
 def test_round_trip_no_loss(tmp_path):
@@ -384,3 +384,50 @@ def test_resolve_nonexistent_conflict_raises(tmp_path):
     conflicts = ConflictsStore(str(tmp_path / "c.json"))
     with pytest.raises(KeyError):
         resolve_conflict("missing", {}, conflicts, storage, settings, device_id="A")
+
+
+# --- Tombstone-Kompaktierung: Watermark-Propagation ---
+
+def _meta_doc(entries=None, conflicts=None, watermark=""):
+    d = _doc(entries=entries, conflicts=conflicts)
+    d["schema_version"] = 2
+    d["meta"] = {"gc_watermark": watermark}
+    return d
+
+
+def test_merge_watermark_propagates_max():
+    local = _meta_doc(watermark="2026-05-01T00:00:00Z")
+    remote = _meta_doc(watermark="2026-05-10T00:00:00Z")
+    merged = merge(local, remote, "2026-04-01T00:00:00Z")
+    assert merged["meta"]["gc_watermark"] == "2026-05-10T00:00:00Z"
+
+
+def test_merge_watermark_monotonic_local_wins_when_remote_missing_meta():
+    """v1-Remote ohne meta darf das lokale Watermark nicht zurücksetzen."""
+    local = _meta_doc(watermark="2026-05-10T00:00:00Z")
+    remote = _doc()  # schema_version 1, kein meta
+    merged = merge(local, remote, "2026-04-01T00:00:00Z")
+    assert merged["meta"]["gc_watermark"] == "2026-05-10T00:00:00Z"
+
+
+def test_merge_no_meta_either_side_yields_empty_watermark():
+    merged = merge(_doc(), _doc(), "2026-04-01T00:00:00Z")
+    assert merged["meta"]["gc_watermark"] == ""
+
+
+def test_build_local_doc_includes_watermark_from_settings(tmp_path):
+    storage = Storage(str(tmp_path / "z.json"), device_id="A")
+    settings = Settings(str(tmp_path / "s.json"))
+    settings.set("gc_watermark", "2026-05-10T00:00:00Z")
+    conflicts = ConflictsStore(str(tmp_path / "c.json"))
+    doc = build_local_doc(storage, settings, conflicts)
+    assert doc["meta"]["gc_watermark"] == "2026-05-10T00:00:00Z"
+
+
+def test_apply_merged_doc_persists_watermark(tmp_path):
+    storage = Storage(str(tmp_path / "z.json"), device_id="A")
+    settings = Settings(str(tmp_path / "s.json"))
+    conflicts = ConflictsStore(str(tmp_path / "c.json"))
+    merged = _meta_doc(watermark="2026-05-11T00:00:00Z")
+    apply_merged_doc(merged, storage, settings, conflicts)
+    assert settings.get("gc_watermark") == "2026-05-11T00:00:00Z"
