@@ -257,7 +257,10 @@ def apply_merged_doc(merged_doc, storage, settings, conflicts_store):
 def compact_doc(doc, now):
     """Pure: liefert eine Kopie von `doc` mit gesetztem gc_watermark=now und
     entfernten settled Tombstones (deleted-Einträge + resolved Konflikte mit
-    Zeit < now). Mutiert `doc` nicht."""
+    Zeit < now). Mutiert `doc` nicht.
+
+    Setzt ein v2-fähiges Doc voraus (Caller guarded mit `_remote_is_pre_v2`);
+    `compact_doc` re-stempelt SCHEMA_VERSION bedingungslos."""
     return {
         "schema_version": SCHEMA_VERSION,
         "entries": {

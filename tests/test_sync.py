@@ -591,7 +591,7 @@ def test_merge_no_suppression_when_remote_present():
 from src.sync import compact_doc, compact_local, _remote_is_pre_v2
 
 
-def test_compact_doc_sets_watermark_and_strips(tmp_path=None):
+def test_compact_doc_sets_watermark_and_strips():
     now = "2026-06-09T12:00:00Z"
     doc = _meta_doc(
         entries={
@@ -635,7 +635,10 @@ def test_compact_local_strips_stores_and_sets_watermark(tmp_path):
          "detected_at": "...", "resolved": False, "resolution": None,
          "resolved_at": None, "resolved_by": None},
     ])
-    now = "2026-06-09T12:00:00Z"
+    # Watermark unzweideutig in der Zukunft jeder realen delete()-Stempelung
+    # (storage.delete stempelt modified_at = wall-clock UTC); sonst flippt
+    # der Strip ab dem Watermark-Zeitpunkt (_is_settled_entry nutzt strikt <).
+    now = "2099-01-01T00:00:00Z"
     compact_local(storage, settings, conflicts, now)
 
     assert settings.get("gc_watermark") == now
