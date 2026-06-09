@@ -431,3 +431,100 @@ def test_apply_merged_doc_persists_watermark(tmp_path):
     merged = _meta_doc(watermark="2026-05-11T00:00:00Z")
     apply_merged_doc(merged, storage, settings, conflicts)
     assert settings.get("gc_watermark") == "2026-05-11T00:00:00Z"
+
+
+# --- Regel 1: settled Tombstones droppen ---
+
+def test_merge_drops_settled_entry_tombstone():
+    wm = "2026-05-10T00:00:00Z"
+    local = _meta_doc(
+        entries={"D": _e(None, None, None, "2026-05-05T00:00:00Z", deleted=True)},
+        watermark=wm,
+    )
+    merged = merge(local, _meta_doc(watermark=wm), "2026-04-01T00:00:00Z")
+    assert "D" not in merged["entries"]
+
+
+def test_merge_keeps_tombstone_at_or_after_watermark():
+    wm = "2026-05-10T00:00:00Z"
+    # genau auf der Grenze: strikt < → bleibt
+    local = _meta_doc(
+        entries={"D": _e(None, None, None, wm, deleted=True)},
+        watermark=wm,
+    )
+    merged = merge(local, _meta_doc(watermark=wm), "2026-04-01T00:00:00Z")
+    assert "D" in merged["entries"]
+
+
+def test_merge_keeps_live_entry_older_than_watermark():
+    """Regel 1 entfernt nur deleted-Einträge, keine lebenden."""
+    wm = "2026-05-10T00:00:00Z"
+    local = _meta_doc(
+        entries={"D": _e("08:00", "16:00", 30, "2026-05-05T00:00:00Z")},
+        watermark=wm,
+    )
+    merged = merge(local, _meta_doc(watermark=wm), "2026-04-01T00:00:00Z")
+    assert "D" in merged["entries"]
+
+
+def test_merge_compaction_propagates_and_sticks():
+    """Gerät B hält lokalen Tombstone, pullt kompaktierten Remote (ohne D,
+    Watermark gesetzt) → B verwirft den Tombstone, lädt ihn nicht erneut hoch."""
+    wm = "2026-05-10T00:00:00Z"
+    local = _meta_doc(  # B hat den alten Tombstone noch
+        entries={"D": _e(None, None, None, "2026-05-05T00:00:00Z", deleted=True)},
+        watermark="",
+    )
+    remote = _meta_doc(entries={}, watermark=wm)  # bereits kompaktiert
+    merged = merge(local, remote, "2026-05-06T00:00:00Z")
+    assert "D" not in merged["entries"]
+    assert merged["meta"]["gc_watermark"] == wm
+
+
+def test_merge_recovers_after_failed_compaction_push():
+    """Partial-Failure: lokal wurde kompaktiert (Watermark=now gesetzt), aber der
+    Push schlug fehl → Remote trägt den Tombstone noch. Beim nächsten Sync gewinnt
+    das höhere lokale Watermark monoton und Regel 1 entfernt den Remote-Tombstone."""
+    now = "2026-06-09T12:00:00Z"
+    local = _meta_doc(entries={}, watermark=now)  # lokal schon kompaktiert
+    remote = _meta_doc(  # Remote hat den alten Tombstone noch, altes/leeres Watermark
+        entries={"D": _e(None, None, None, "2026-05-05T00:00:00Z", deleted=True)},
+        watermark="",
+    )
+    merged = merge(local, remote, "2026-05-06T00:00:00Z")
+    assert "D" not in merged["entries"]
+    assert merged["meta"]["gc_watermark"] == now
+
+
+def test_merge_drops_settled_resolved_conflict():
+    wm = "2026-05-10T00:00:00Z"
+    c = _conflict("c-1", resolved=True, resolution={"start": "08:00"},
+                  resolved_at="2026-05-05T00:00:00Z", resolved_by="A")
+    local = _meta_doc(conflicts=[c], watermark=wm)
+    merged = merge(local, _meta_doc(watermark=wm), "2026-04-01T00:00:00Z")
+    assert merged["conflicts"] == []
+
+
+def test_merge_keeps_resolved_conflict_without_resolved_at():
+    """Defensiv: resolved=True aber resolved_at None/'' → nicht droppen (kein Crash)."""
+    wm = "2026-05-10T00:00:00Z"
+    c = _conflict("c-1", resolved=True, resolution={"start": "08:00"},
+                  resolved_at=None, resolved_by="A")
+    local = _meta_doc(conflicts=[c], watermark=wm)
+    merged = merge(local, _meta_doc(watermark=wm), "2026-04-01T00:00:00Z")
+    assert len(merged["conflicts"]) == 1
+
+
+def test_merge_keeps_unresolved_conflict_regardless_of_watermark():
+    wm = "2026-05-10T00:00:00Z"
+    c = _conflict("c-1", resolved=False)
+    local = _meta_doc(conflicts=[c], watermark=wm)
+    merged = merge(local, _meta_doc(watermark=wm), "2026-04-01T00:00:00Z")
+    assert len(merged["conflicts"]) == 1
+
+
+def test_merge_no_drop_when_watermark_empty():
+    """Backwards-compat: ohne Watermark verhält sich merge wie bisher."""
+    local = _doc(entries={"D": _e(None, None, None, "2026-05-05T00:00:00Z", deleted=True)})
+    merged = merge(local, _doc(), "2026-04-01T00:00:00Z")
+    assert "D" in merged["entries"]

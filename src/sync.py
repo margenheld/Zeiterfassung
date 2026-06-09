@@ -20,6 +20,15 @@ SCHEMA_VERSION = 2
 def _watermark_of(doc):
     return ((doc.get("meta") or {}).get("gc_watermark") or "")
 
+
+def _is_settled_entry(entry, watermark):
+    return bool(entry.get("deleted")) and (entry.get("modified_at") or "") < watermark
+
+
+def _is_settled_conflict(conflict, watermark):
+    resolved_at = conflict.get("resolved_at") or ""
+    return bool(conflict.get("resolved")) and resolved_at != "" and resolved_at < watermark
+
 SYNCED_SETTING_KEYS = (
     "recipient", "name", "hourly_rate",
     "mail_subject", "mail_greeting", "mail_content", "mail_closing",
@@ -203,6 +212,18 @@ def merge(local, remote, last_pull_at):
                     "modified_at": resolved_at,
                     "device_id": resolved_by,
                 }
+
+    # Regel 1: settled Tombstones entfernen (Kompaktierung propagieren).
+    # Läuft NACH der Resolution-Application, damit kein resolved-Wert verloren geht.
+    if watermark:
+        merged["entries"] = {
+            k: v for k, v in merged["entries"].items()
+            if not _is_settled_entry(v, watermark)
+        }
+        merged["conflicts"] = [
+            c for c in merged["conflicts"]
+            if not _is_settled_conflict(c, watermark)
+        ]
 
     return merged
 
