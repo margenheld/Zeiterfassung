@@ -142,6 +142,8 @@ def merge(local, remote, last_pull_at):
     }
     watermark = max(_watermark_of(local), _watermark_of(remote))
     merged["meta"]["gc_watermark"] = watermark
+    remote_wm = _watermark_of(remote)
+    excluded = bool(last_pull_at) and last_pull_at < remote_wm
     new_conflicts = []
 
     # Entries
@@ -151,6 +153,11 @@ def merge(local, remote, last_pull_at):
         r = remote.get("entries", {}).get(key)
         winner, conflict = _merge_one(l, r, last_pull_at,
                                        equal_fn=_values_equal_entry, kind="entry", key=key)
+        # Regel 2: Self-Heal — ein zurückgekehrtes (excluded) Gerät darf einen
+        # alten, remote-fehlenden lebenden Eintrag nicht auferstehen lassen.
+        if (excluded and r is None and l is not None
+                and (l.get("modified_at") or "") < remote_wm):
+            winner = None
         if winner is not None:
             merged["entries"][key] = winner
         if conflict is not None:

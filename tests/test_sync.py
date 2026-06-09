@@ -457,13 +457,14 @@ def test_merge_keeps_tombstone_at_or_after_watermark():
 
 
 def test_merge_keeps_live_entry_older_than_watermark():
-    """Regel 1 entfernt nur deleted-Einträge, keine lebenden."""
+    """Regel 1 entfernt nur deleted-Einträge, keine lebenden.
+    last_pull_at == wm → Gerät ist nicht excluded (kein Regel-2-Eingriff)."""
     wm = "2026-05-10T00:00:00Z"
     local = _meta_doc(
         entries={"D": _e("08:00", "16:00", 30, "2026-05-05T00:00:00Z")},
         watermark=wm,
     )
-    merged = merge(local, _meta_doc(watermark=wm), "2026-04-01T00:00:00Z")
+    merged = merge(local, _meta_doc(watermark=wm), wm)
     assert "D" in merged["entries"]
 
 
@@ -527,4 +528,59 @@ def test_merge_no_drop_when_watermark_empty():
     """Backwards-compat: ohne Watermark verhält sich merge wie bisher."""
     local = _doc(entries={"D": _e(None, None, None, "2026-05-05T00:00:00Z", deleted=True)})
     merged = merge(local, _doc(), "2026-04-01T00:00:00Z")
+    assert "D" in merged["entries"]
+
+
+# --- Regel 2: Self-Heal-Suppression ---
+
+def test_merge_suppresses_stale_live_entry_for_excluded_device():
+    """Zurückkehrendes Gerät (last_pull_at < remote.watermark) verwirft einen
+    alten, anderswo gelöschten-und-kompaktierten Tag statt ihn aufstehen zu lassen."""
+    wm = "2026-05-10T00:00:00Z"
+    local = _meta_doc(
+        entries={"D": _e("08:00", "16:00", 30, "2026-05-05T00:00:00Z")},  # alt, lebend
+        watermark="",
+    )
+    remote = _meta_doc(entries={}, watermark=wm)  # D wurde anderswo kompaktiert
+    # last_pull_at < remote.watermark → excluded
+    merged = merge(local, remote, "2026-05-06T00:00:00Z")
+    assert "D" not in merged["entries"]
+
+
+def test_merge_first_sync_device_keeps_history():
+    """Erstsync (last_pull_at == '') ist NICHT excluded → Historie bleibt/lädt hoch."""
+    wm = "2026-05-10T00:00:00Z"
+    local = _meta_doc(
+        entries={"D": _e("08:00", "16:00", 30, "2026-05-05T00:00:00Z")},
+        watermark="",
+    )
+    remote = _meta_doc(entries={}, watermark=wm)
+    merged = merge(local, remote, "")  # Erstsync
+    assert merged["entries"]["D"]["start"] == "08:00"
+
+
+def test_merge_keeps_fresh_offline_edit_for_excluded_device():
+    """Excluded, aber Eintrag NEUER als Watermark → echter Offline-Edit, bleibt."""
+    wm = "2026-05-10T00:00:00Z"
+    local = _meta_doc(
+        entries={"D": _e("08:00", "16:00", 30, "2026-05-15T00:00:00Z")},  # > watermark
+        watermark="",
+    )
+    remote = _meta_doc(entries={}, watermark=wm)
+    merged = merge(local, remote, "2026-05-06T00:00:00Z")  # excluded
+    assert merged["entries"]["D"]["start"] == "08:00"
+
+
+def test_merge_no_suppression_when_remote_present():
+    """Suppression greift nur bei remote-fehlendem Key."""
+    wm = "2026-05-10T00:00:00Z"
+    local = _meta_doc(
+        entries={"D": _e("08:00", "16:00", 30, "2026-05-05T00:00:00Z")},
+        watermark="",
+    )
+    remote = _meta_doc(
+        entries={"D": _e("09:00", "17:00", 30, "2026-05-04T00:00:00Z")},
+        watermark=wm,
+    )
+    merged = merge(local, remote, "2026-05-06T00:00:00Z")
     assert "D" in merged["entries"]
