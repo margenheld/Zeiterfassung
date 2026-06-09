@@ -254,6 +254,51 @@ def apply_merged_doc(merged_doc, storage, settings, conflicts_store):
     settings.set("gc_watermark", (merged_doc.get("meta") or {}).get("gc_watermark") or "")
 
 
+def compact_doc(doc, now):
+    """Pure: liefert eine Kopie von `doc` mit gesetztem gc_watermark=now und
+    entfernten settled Tombstones (deleted-Einträge + resolved Konflikte mit
+    Zeit < now). Mutiert `doc` nicht."""
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "entries": {
+            k: v for k, v in doc.get("entries", {}).items()
+            if not _is_settled_entry(v, now)
+        },
+        "settings": dict(doc.get("settings", {})),
+        "conflicts": [
+            c for c in doc.get("conflicts", [])
+            if not _is_settled_conflict(c, now)
+        ],
+        "meta": {"gc_watermark": now},
+    }
+
+
+def compact_local(storage, settings, conflicts_store, now):
+    """Schreibt das gc_watermark lokal und strippt settled Tombstones aus
+    Storage und ConflictsStore. Ein lokaler Schreibvorgang pro Store
+    (Wiederverwendung von storage.apply_merge — Required-Key-Validator +
+    Atomic-Write bleiben auf einem Pfad)."""
+    settings.set("gc_watermark", now)
+    storage.apply_merge({
+        k: v for k, v in storage.get_all_raw().items()
+        if not _is_settled_entry(v, now)
+    })
+    conflicts_store.save_all([
+        c for c in conflicts_store.get_all()
+        if not _is_settled_conflict(c, now)
+    ])
+
+
+def _remote_is_pre_v2(remote_doc):
+    """True, wenn das Remote-Doc von einem v1-Gerät stammt (Schema < 2 oder
+    fehlendes/leeres meta ohne gc_watermark-Key) — dann ist gerade ein älteres
+    Gerät aktiv und die Kompaktierung muss abbrechen."""
+    if (remote_doc.get("schema_version") or 1) < 2:
+        return True
+    meta = remote_doc.get("meta")
+    return not (isinstance(meta, dict) and "gc_watermark" in meta)
+
+
 def resolve_conflict(conflict_id, chosen_value, conflicts_store, storage, settings, device_id):
     """User hat einen Konflikt aufgelöst. chosen_value enthält den gewählten
     (oder manuell editierten) Wert. Für entries: {start, end, pause} (und
