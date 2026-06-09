@@ -466,7 +466,7 @@ def open_settings_dialog(parent, settings, base_path, on_change, *,
             padx=12, pady=2,
         ).grid(row=26, column=0, columnspan=2, padx=10, pady=(4, 8), sticky="w")
 
-    if settings.get("sync_enabled"):
+    if settings.get("sync_enabled") and storage is not None and conflicts_store is not None:
         def _on_compact_clicked():
             confirmed = messagebox.askyesno(
                 "Sync-Daten kompaktieren",
