@@ -245,6 +245,27 @@ def secondary_button(parent, text, command, font=FONT, padx=16, pady=4):
     )
 
 
+def set_primary_button_enabled(btn, enabled):
+    """Schaltet einen `primary_button` optisch aktiv/inaktiv: deaktiviert =
+    gedämpfter Rotton (ACCENT_DISABLED) + Pfeil-Cursor, kein Hover-Wechsel.
+
+    Mutiert `_colors` (die Enter/Leave-Handler lesen frisch daraus) analog
+    set_toggle_active. Wichtig: nur die OPTIK — die `command`/on_click-Bindung
+    bleibt aktiv, daher muss der Callback selbst bei disabled ein No-op machen
+    (Klick auf einen optisch deaktivierten Button soll nichts tun)."""
+    cursor = "hand2" if enabled else "arrow"
+    c = (
+        {"bg": ACCENT, "fg": "#ffffff",
+         "hover_bg": ACCENT_HOVER, "hover_fg": "#ffffff"}
+        if enabled else
+        {"bg": ACCENT_DISABLED, "fg": TEXT_MUTED,
+         "hover_bg": ACCENT_DISABLED, "hover_fg": TEXT_MUTED}
+    )
+    btn._colors = c
+    btn.config(bg=c["bg"], cursor=cursor)
+    btn._label.config(bg=c["bg"], fg=c["fg"], cursor=cursor)
+
+
 def _toggle_colors(active) -> _ToggleColors:
     if active:
         # Aktive Toggle-Variante: kein Hover-Farbwechsel (würde wie "klickbar" aussehen)
@@ -727,21 +748,9 @@ def themed_ask_delete_choice(parent, title: str, message: str, options):
     secondary_button(btn_frame, "Abbrechen", click_cancel).pack(side=tk.LEFT, padx=6)
 
     def _refresh_delete_btn(*_):
-        """Löschen-Button nur klickbar, wenn mind. eine Option gewählt ist —
-        sonst gedämpfter Rotton + Pfeil-Cursor (sichtbar deaktiviert). Mutiert
-        `_colors` analog set_toggle_active; die Hover-Handler lesen frisch."""
-        enabled = any(var.get() for var in vars_by_key.values())
-        cursor = "hand2" if enabled else "arrow"
-        c = (
-            {"bg": ACCENT, "fg": "#ffffff",
-             "hover_bg": ACCENT_HOVER, "hover_fg": "#ffffff"}
-            if enabled else
-            {"bg": ACCENT_DISABLED, "fg": TEXT_MUTED,
-             "hover_bg": ACCENT_DISABLED, "hover_fg": TEXT_MUTED}
-        )
-        delete_btn._colors = c
-        delete_btn.config(bg=c["bg"], cursor=cursor)
-        delete_btn._label.config(bg=c["bg"], fg=c["fg"], cursor=cursor)
+        # Löschen nur klickbar, wenn mind. eine Option gewählt ist.
+        set_primary_button_enabled(
+            delete_btn, any(var.get() for var in vars_by_key.values()))
 
     for cb in checkbuttons:
         cb.config(command=_refresh_delete_btn)
