@@ -126,9 +126,12 @@ class App:
         self.root.configure(bg=BG)
         apply_dark_titlebar(self.root)
 
-        # Set unique AppUserModelID so Windows shows our icon in taskbar
+        # Set unique AppUserModelID so Windows shows our icon in taskbar.
+        # Dieser String ist ohne registrierten DisplayName auch der Absender-
+        # Name oben in Toast-Benachrichtigungen — daher den lesbaren App-Namen
+        # statt einer technischen ID ("margenheld.zeiterfassung") verwenden.
         try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("margenheld.zeiterfassung")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Zeiterfassung")
         except Exception:
             pass
 
