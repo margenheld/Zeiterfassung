@@ -12,7 +12,7 @@ from src.report import generate_pdf, generate_report
 from src.theme import (
     BG, FONT, TEXT,
     apply_app_icon, apply_combobox_style, apply_dark_titlebar,
-    attach_unfocus_on_click, bring_dialog_to_front, center_dialog_on_parent,
+    attach_unfocus_on_click, center_dialog_on_parent,
     disable_min_max, dark_combo, primary_button, secondary_button,
     themed_showinfo,
 )
@@ -247,4 +247,3 @@ def open_send_dialog(parent, storage, settings, base_path):
     secondary_button(btn_frame, "Abbrechen", dialog.destroy).pack(side=tk.LEFT, padx=5)
 
     center_dialog_on_parent(dialog, parent)
-    bring_dialog_to_front(dialog)

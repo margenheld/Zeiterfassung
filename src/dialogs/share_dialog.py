@@ -13,7 +13,7 @@ from src.share import build_share_doc, serialize_share_doc
 from src.theme import (
     BG, FONT, TEXT,
     apply_app_icon, apply_dark_titlebar, attach_unfocus_on_click,
-    bring_dialog_to_front, center_dialog_on_parent, disable_min_max,
+    center_dialog_on_parent, disable_min_max,
     dark_entry, primary_button, secondary_button, themed_showinfo,
 )
 
@@ -198,4 +198,3 @@ def open_share_dialog(parent, storage, settings, base_path, reservation_store=No
     secondary_button(btn_frame, "Abbrechen", dialog.destroy).pack(side=tk.LEFT, padx=5)
 
     center_dialog_on_parent(dialog, parent)
-    bring_dialog_to_front(dialog)

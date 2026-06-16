@@ -392,8 +392,19 @@ def center_dialog_on_parent(dialog, parent):
 
     Muss gerufen werden, nachdem alle Widgets erstellt sind, damit
     winfo_reqwidth/reqheight die finale Größe liefern.
+
+    transient() bindet den Dialog an den Parent (Z-Order über Parent, Icon,
+    gemeinsames Minimieren). ABER: Ist der Parent gerade `withdraw()`n (Tray-
+    Modus — Dialog kommt aus einer Tray-Quick-Action), zeigt der Window-Manager
+    ein transientes Fenster zu einem versteckten Master NICHT sauber an: es
+    erscheint unfokussiert hinter anderen Fenstern und die Dark-Titelleiste
+    wird nicht gerendert. Daher transient nur bei sichtbarem Parent setzen; ist
+    er versteckt, bleibt der Dialog ein eigenständiges Top-Level und wird unten
+    selbst in den Vordergrund geholt und fokussiert.
     """
-    dialog.transient(parent)
+    parent_viewable = bool(parent.winfo_viewable())
+    if parent_viewable:
+        dialog.transient(parent)
     dialog.update_idletasks()
     w = dialog.winfo_reqwidth()
     h = dialog.winfo_reqheight()
@@ -410,23 +421,11 @@ def center_dialog_on_parent(dialog, parent):
     y = max(wa_top, min(y, max(wa_top, wa_bottom - h)))
     dialog.geometry(f"+{x}+{y}")
 
-
-def bring_dialog_to_front(dialog):
-    """Holt einen Dialog sicher in den Vordergrund und gibt ihm den Tastatur-
-    Fokus.
-
-    Nötig, wenn der Parent (Hauptfenster) gerade `withdraw()`n ist — etwa bei
-    einer Tray-Quick-Action (Senden/Teilen aus dem Tray-Menü): Windows
-    aktiviert den neuen Toplevel dann nicht von selbst, der Dialog erscheint
-    unfokussiert hinter anderen Fenstern. `grab_set()`+`focus_set()` allein
-    reichen dafür nicht. Der kurze topmost-Toggle hebt das Fenster über andere,
-    ohne es dauerhaft anzupinnen; `focus_force()` zieht den Eingabefokus.
-
-    Harmlos, wenn der Parent sichtbar ist (Dialog ist dann ohnehin vorn)."""
-    dialog.lift()
-    dialog.attributes("-topmost", True)
-    dialog.attributes("-topmost", False)
-    dialog.focus_force()
+    if not parent_viewable:
+        # Ohne transient-Bindung muss der Dialog selbst nach vorn — sonst
+        # öffnet er bei verstecktem Hauptfenster unfokussiert im Hintergrund.
+        dialog.lift()
+        dialog.focus_force()
 
 
 def _hex_to_colorref(hex_color: str) -> int:
