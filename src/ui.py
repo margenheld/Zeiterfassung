@@ -127,11 +127,26 @@ class App:
         apply_dark_titlebar(self.root)
 
         # Set unique AppUserModelID so Windows shows our icon in taskbar.
-        # Dieser String ist ohne registrierten DisplayName auch der Absender-
-        # Name oben in Toast-Benachrichtigungen — daher den lesbaren App-Namen
-        # statt einer technischen ID ("margenheld.zeiterfassung") verwenden.
+        # Die AUMID ist ohne registrierten DisplayName auch der Absender-Name
+        # oben in Toast-Benachrichtigungen. Sie darf aber KEINE Leerzeichen
+        # enthalten — daher die ID leerzeichenfrei halten und den lesbaren
+        # Namen (inkl. dynamischer Version) separat als DisplayName in der
+        # Registry registrieren. Den greift Windows für die Toast-Attribution.
+        app_aumid = "Zeiterfassung"
         try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Zeiterfassung")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_aumid)
+        except Exception:
+            pass
+        try:
+            import winreg
+            with winreg.CreateKeyEx(
+                winreg.HKEY_CURRENT_USER,
+                rf"Software\Classes\AppUserModelId\{app_aumid}",
+            ) as _aumid_key:
+                winreg.SetValueEx(
+                    _aumid_key, "DisplayName", 0, winreg.REG_SZ,
+                    f"Zeiterfassung v{VERSION}",
+                )
         except Exception:
             pass
 
