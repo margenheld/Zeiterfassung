@@ -413,12 +413,19 @@ def center_dialog_on_parent(dialog, parent):
     pw = parent.winfo_width()
     ph = parent.winfo_height()
     wa_left, wa_top, wa_right, wa_bottom = _parent_workarea(parent)
-    x = px + max(0, (pw - w) // 2)
-    y = py + max(0, (ph - h) // 2)
-    # max(wa_*, wa_*_far - *) sorgt dafür, dass bei einem Dialog größer als
-    # der Bildschirm der obere/linke Rand sichtbar bleibt.
-    x = max(wa_left, min(x, max(wa_left, wa_right - w)))
-    y = max(wa_top, min(y, max(wa_top, wa_bottom - h)))
+    if parent_viewable:
+        x = px + max(0, (pw - w) // 2)
+        y = py + max(0, (ph - h) // 2)
+        # max(wa_*, wa_*_far - *) sorgt dafür, dass bei einem Dialog größer als
+        # der Bildschirm der obere/linke Rand sichtbar bleibt.
+        x = max(wa_left, min(x, max(wa_left, wa_right - w)))
+        y = max(wa_top, min(y, max(wa_top, wa_bottom - h)))
+    else:
+        # Hauptfenster versteckt (Tray-Quick-Action): an der letzten Parent-
+        # Position zu zentrieren wirkt zufällig. Stattdessen auf der Arbeits-
+        # fläche des (zuletzt genutzten) Monitors mittig setzen.
+        x = wa_left + max(0, (wa_right - wa_left - w) // 2)
+        y = wa_top + max(0, (wa_bottom - wa_top - h) // 2)
     dialog.geometry(f"+{x}+{y}")
 
     if not parent_viewable:
