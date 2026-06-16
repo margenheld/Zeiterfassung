@@ -411,6 +411,24 @@ def center_dialog_on_parent(dialog, parent):
     dialog.geometry(f"+{x}+{y}")
 
 
+def bring_dialog_to_front(dialog):
+    """Holt einen Dialog sicher in den Vordergrund und gibt ihm den Tastatur-
+    Fokus.
+
+    Nötig, wenn der Parent (Hauptfenster) gerade `withdraw()`n ist — etwa bei
+    einer Tray-Quick-Action (Senden/Teilen aus dem Tray-Menü): Windows
+    aktiviert den neuen Toplevel dann nicht von selbst, der Dialog erscheint
+    unfokussiert hinter anderen Fenstern. `grab_set()`+`focus_set()` allein
+    reichen dafür nicht. Der kurze topmost-Toggle hebt das Fenster über andere,
+    ohne es dauerhaft anzupinnen; `focus_force()` zieht den Eingabefokus.
+
+    Harmlos, wenn der Parent sichtbar ist (Dialog ist dann ohnehin vorn)."""
+    dialog.lift()
+    dialog.attributes("-topmost", True)
+    dialog.attributes("-topmost", False)
+    dialog.focus_force()
+
+
 def _hex_to_colorref(hex_color: str) -> int:
     """Wandelt '#RRGGBB' in Win32 COLORREF (0x00BBGGRR) — Win32 erwartet
     BGR-Byteorder, nicht RGB."""

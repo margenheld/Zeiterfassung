@@ -636,6 +636,15 @@ class App:
                 self.base_path,
                 on_show=lambda: self.root.after(0, self._restore_from_tray),
                 on_quit=lambda: self.root.after(0, self._quit_with_sync_push),
+                actions=[
+                    ("Monat senden",
+                     lambda: self.root.after(0, self._send), None),
+                    ("Teilen…",
+                     lambda: self.root.after(0, self._share), None),
+                    ("Mit Google Drive synchronisieren",
+                     lambda: self.root.after(0, self._tray_sync),
+                     lambda: bool(self.settings.get("sync_enabled"))),
+                ],
             )
             try:
                 tray.start()
@@ -1299,6 +1308,40 @@ class App:
         # markers appear immediately without requiring a manual view-change.
         self._refresh()
         self._update_sync_status_label()
+
+    def _tray_sync(self):
+        """Drive-Sync aus dem Tray-Menü. Wie _on_sync_clicked, aber das Ergebnis
+        geht als Tray-Toast zurück statt ins (im Tray-Modus versteckte) Status-
+        Label. Der Menüpunkt ist ohnehin nur bei aktivem Sync sichtbar; der
+        Guard fängt den Grenzfall ab, dass Sync zwischen Menü-Öffnen und Klick
+        deaktiviert wurde."""
+        if not self.settings.get("sync_enabled"):
+            return
+        import threading
+        from src.main import _run_push_blocking
+
+        def _do():
+            result = _run_push_blocking(
+                self.storage, self.settings, self.conflicts_store,
+                self.base_path, timeout_seconds=15,
+            )
+            self.root.after(0, lambda: self._on_tray_sync_done(result))
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _on_tray_sync_done(self, result):
+        # Still aktualisieren, damit der nächste Fenster-Aufruf den Stand zeigt.
+        self._refresh()
+        self._update_sync_status_label()
+        if self._tray is None:
+            return
+        if result.get("ok"):
+            n = (self.conflicts_store.count_unresolved()
+                 if self.conflicts_store is not None else 0)
+            msg = ("Synchronisiert." if n == 0
+                   else f"Synchronisiert — {n} Konflikt{'e' if n != 1 else ''} offen.")
+            self._tray.notify(msg)
+        else:
+            self._tray.notify(f"Sync fehlgeschlagen:\n{result.get('error', '?')}")
 
     def _on_close(self):
         # Bei aktivem Minimize-to-Tray klappt der X-Button das Fenster nur weg;
