@@ -1352,14 +1352,18 @@ class App:
         self._update_sync_status_label()
         if self._tray is None:
             return
+        # title="" — kein fetter Titel: der Absender oben („Zeiterfassung
+        # vX.Y.Z") nennt die App bereits, eine zusätzliche „Zeiterfassung"-
+        # Titelzeile wäre redundant. Es bleibt nur die Statusmeldung.
         if result.get("ok"):
             n = (self.conflicts_store.count_unresolved()
                  if self.conflicts_store is not None else 0)
             msg = ("Synchronisiert." if n == 0
                    else f"Synchronisiert — {n} Konflikt{'e' if n != 1 else ''} offen.")
-            self._tray.notify(msg)
+            self._tray.notify(msg, title="")
         else:
-            self._tray.notify(f"Sync fehlgeschlagen:\n{result.get('error', '?')}")
+            self._tray.notify(f"Sync fehlgeschlagen:\n{result.get('error', '?')}",
+                              title="")
 
     def _on_close(self):
         # Bei aktivem Minimize-to-Tray klappt der X-Button das Fenster nur weg;
