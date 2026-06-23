@@ -74,11 +74,15 @@ def _run_pull_in_background(storage, settings, conflicts_store, base, ui_callbac
                     logging.getLogger(__name__).warning(
                         "Quarantine rename failed for %s", fid, exc_info=True)
             remote_doc = _parse_remote_or_quarantine(content, file_id, _quarantine)
-            if sync._remote_is_pre_v3(remote_doc):
-                # Älteres Gerät aktiv: nicht mergen (ein v2-Eintrag hat kein
-                # 'slots' → würde apply_merge verletzen / Daten plätten).
-                ui_callback(ok=False, error=sync.OLD_REMOTE_VERSION_MSG, tb="")
-                return
+        if sync._remote_is_newer(remote_doc):
+            # Neueres (zukünftiges) Schema: NICHT mergen/pushen — Pull sauber
+            # abbrechen, last_pull_at/etag unverändert lassen.
+            ui_callback(ok=False, error=sync.NEWER_REMOTE_VERSION_MSG, tb="")
+            return
+        # Älteres Remote (v1/v2) wird aufs aktuelle Schema migriert und normal
+        # gemergt (absorb-and-upgrade). Dass ältere Geräte ein hochgezogenes
+        # v3-Doc nicht überschreiben, sichert deren Push-Guard (ab v1.15.2).
+        remote_doc = sync.migrate_doc_to_v3(remote_doc)
         local_doc = sync.build_local_doc(storage, settings, conflicts_store)
         merged = sync.merge(local_doc, remote_doc, settings.get("last_pull_at") or "")
         sync.apply_merged_doc(merged, storage, settings, conflicts_store)
@@ -109,30 +113,39 @@ def _run_push_blocking(storage, settings, conflicts_store, base, timeout_seconds
                 gcal_enabled=settings.get("gcal_enabled"),
             )
             file_id = drive.find_sync_file(service)
+            # Push = download -> Guard -> Merge -> upload. drive.upload kennt
+            # kein File-level If-Match (ignoriert expected_etag), daher MUSS hier
+            # das frische Remote-Doc gelesen und gemergt werden — sonst
+            # überschreibt der Push fremde oder neuere Stände blind (Datenverlust
+            # bzw. Clobber eines neueren Schemas während eines Rollouts).
+            if file_id is not None:
+                remote_bytes, _etag = drive.download(service, file_id)
+                try:
+                    remote_doc = json.loads(remote_bytes)
+                except (json.JSONDecodeError, ValueError):
+                    remote_doc = {"schema_version": 1, "entries": {}, "settings": {}, "conflicts": []}
+                if sync._remote_is_newer(remote_doc):
+                    # Neueres Gerät hat das Remote-Doc fortgeschrieben: nicht
+                    # mergen/überschreiben — Push abbrechen, neuere Daten bleiben.
+                    result["ok"] = False
+                    result["error"] = sync.NEWER_REMOTE_VERSION_MSG
+                    result["tb"] = ""
+                    return
+            else:
+                remote_doc = {"schema_version": 1, "entries": {}, "settings": {}, "conflicts": []}
+            # Älteres Remote (v1/v2) absorbieren: aufs aktuelle Schema migrieren,
+            # dann mergen — sonst gingen v2-only-Stände beim Upload verloren.
+            remote_doc = sync.migrate_doc_to_v3(remote_doc)
+            local_doc = sync.build_local_doc(storage, settings, conflicts_store)
+            merged = sync.merge(local_doc, remote_doc, settings.get("last_pull_at") or "")
+            sync.apply_merged_doc(merged, storage, settings, conflicts_store)
             doc = sync.build_local_doc(storage, settings, conflicts_store)
             content = json.dumps(doc, ensure_ascii=False).encode("utf-8")
-            expected_etag = settings.get("drive_etag")
-            try:
-                new_id, new_etag = drive.upload(service, content, file_id, expected_etag)
-            except drive.DriveConflictError:
-                # Etag-Mismatch: 1× pull-merge-push retry
-                if file_id is not None:
-                    remote_bytes, _ = drive.download(service, file_id)
-                    remote_doc = json.loads(remote_bytes)
-                    if sync._remote_is_pre_v3(remote_doc):
-                        result["ok"] = False
-                        result["error"] = sync.OLD_REMOTE_VERSION_MSG
-                        result["tb"] = ""
-                        return
-                else:
-                    remote_doc = {"schema_version": 1, "entries": {}, "settings": {}, "conflicts": []}
-                local_doc = sync.build_local_doc(storage, settings, conflicts_store)
-                merged = sync.merge(local_doc, remote_doc, settings.get("last_pull_at") or "")
-                sync.apply_merged_doc(merged, storage, settings, conflicts_store)
-                doc = sync.build_local_doc(storage, settings, conflicts_store)
-                content = json.dumps(doc, ensure_ascii=False).encode("utf-8")
-                new_id, new_etag = drive.upload(service, content, file_id, expected_etag="")
-            settings.set("drive_etag", new_etag)
+            new_id, new_etag = drive.upload(service, content, file_id, expected_etag="")
+            settings.set_many({
+                "last_pull_at": sync._utc_now_iso(),
+                "drive_etag": new_etag,
+            })
             result["ok"] = True
         except Exception as e:
             logging.getLogger(__name__).exception("Sync push failed: %s", e)
@@ -153,8 +166,10 @@ def _run_compaction_blocking(storage, settings, conflicts_store, base, timeout_s
     Watermark setzen + lokal strippen → Push. Liefert
     {"ok": bool, "reason": str, "error": ..., "tb": ...}.
 
-    reason == "old_version": ein älteres Gerät ist aktiv (Remote ist pre-v3),
-    Kompaktierung abgebrochen, KEINE Änderung vorgenommen."""
+    reason == "newer_version": ein neueres Gerät hat ein Schema geschrieben, das
+    diese Version nicht versteht — Kompaktierung abgebrochen, kein Merge/Upload
+    (sonst würde das neuere Doc überschrieben). Ältere Remote-Docs (v1/v2) werden
+    wie bei Pull/Push aufs aktuelle Schema migriert."""
     import json
     from src import drive, sync
 
@@ -174,14 +189,17 @@ def _run_compaction_blocking(storage, settings, conflicts_store, base, timeout_s
                     remote_doc = json.loads(content)
                 except (json.JSONDecodeError, ValueError):
                     remote_doc = {"schema_version": 1}
-                # Alt-Client-Guard auf dem FRISCH gepullten Doc (nie gecacht):
-                if sync._remote_is_pre_v3(remote_doc):
-                    result.update({"ok": False, "reason": "old_version"})
+                # Neueres Schema (>v3) auf dem FRISCH gepullten Doc: nicht
+                # mergen/überschreiben — Kompaktierung abbrechen.
+                if sync._remote_is_newer(remote_doc):
+                    result.update({"ok": False, "reason": "newer_version"})
                     return
             else:
                 remote_doc = {"schema_version": 2, "entries": {}, "settings": {},
                               "conflicts": [], "meta": {"gc_watermark": ""}}
 
+            # Älteres Remote (v1/v2) absorbieren: aufs aktuelle Schema migrieren.
+            remote_doc = sync.migrate_doc_to_v3(remote_doc)
             # 1) normaler Merge des frischen Remote-Stands
             now = sync._utc_now_iso()
             local_doc = sync.build_local_doc(storage, settings, conflicts_store)

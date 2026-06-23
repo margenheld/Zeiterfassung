@@ -781,7 +781,7 @@ def themed_ask_delete_choice(parent, title: str, message: str, options, lock_ms:
     apply_app_icon(dialog)
     dialog.focus_set()
 
-    result = {"value": None}
+    result: dict[str, set[str] | None] = {"value": None}
     # Optionaler kurzer Lock nach dem Öffnen: verhindert versehentliches
     # Sofort-Löschen, wenn (wie üblich) alle Optionen vorausgewählt sind.
     unlock = {"ready": lock_ms <= 0}

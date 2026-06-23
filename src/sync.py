@@ -26,6 +26,14 @@ OLD_REMOTE_VERSION_MSG = (
 )
 
 
+NEWER_REMOTE_VERSION_MSG = (
+    "Ein anderes Gerät nutzt eine neuere App-Version mit einem Datenformat, "
+    "das diese (ältere) Version noch nicht versteht.\n\n"
+    "Bitte aktualisiere die App auf diesem Gerät. Bis dahin pausiert die "
+    "Synchronisation, damit keine Daten verloren gehen oder überschrieben werden."
+)
+
+
 def _watermark_of(doc):
     return ((doc.get("meta") or {}).get("gc_watermark") or "")
 
@@ -291,6 +299,52 @@ def _remote_is_pre_v3(remote_doc):
     älteres Gerät aktiv: Kompaktierung muss abbrechen, und ein v2-Remote darf
     nicht in einen v3-Client gemergt werden (er hätte keine `slots`)."""
     return (remote_doc.get("schema_version") or 1) < 3
+
+
+def migrate_doc_to_v3(remote_doc):
+    """Migriert ein Sync-Doc auf das aktuelle Schema (v3): flache Einträge
+    (start/end/pause) werden in eine Slot-Liste gewrappt. Idempotent — Einträge,
+    die bereits `slots` tragen, bleiben unangetastet; Tombstones (deleted=True)
+    bekommen eine leere Slot-Liste. settings/conflicts/meta bleiben unberührt.
+
+    Damit kann ein v3-Client ein älteres (v1/v2) Remote-Doc absorbieren und
+    hochziehen, statt es abzuweisen oder beim Push zu plätten."""
+    entries = remote_doc.get("entries") or {}
+    migrated = {}
+    for date, entry in entries.items():
+        if not isinstance(entry, dict):
+            continue
+        if "slots" in entry:
+            migrated[date] = entry
+            continue
+        if entry.get("deleted"):
+            slots = []
+        else:
+            slots = [{
+                "start": entry.get("start"),
+                "end": entry.get("end"),
+                "pause": entry.get("pause", 0),
+                "kategorie": "",
+            }]
+        migrated[date] = {
+            "slots": slots,
+            "modified_at": entry.get("modified_at"),
+            "device_id": entry.get("device_id"),
+            "deleted": bool(entry.get("deleted", False)),
+        }
+    return {**remote_doc, "schema_version": SCHEMA_VERSION, "entries": migrated}
+
+
+def _remote_is_newer(remote_doc):
+    """True, wenn das Remote-Doc von einer NEUEREN App-Version stammt
+    (schema_version > der hier verstandenen SCHEMA_VERSION).
+
+    Forward-Compat-Guard: Ab Schema 3 enthalten Einträge `slots` statt der
+    flachen `start/end/pause`-Keys. Würde diese ältere Version so ein Doc
+    mergen und via `storage.apply_merge` schreiben, bräche der Required-Key-
+    Validator hart ab ("missing keys ['start','end','pause']"). Stattdessen
+    muss der Pull/Push abbrechen, ohne das neuere Remote-Doc zu überschreiben."""
+    return (remote_doc.get("schema_version") or 1) > SCHEMA_VERSION
 
 
 def resolve_conflict(conflict_id, chosen_value, conflicts_store, storage, settings, device_id):

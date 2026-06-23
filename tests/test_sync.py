@@ -657,3 +657,176 @@ def test_merge_different_slots_conflict_candidates_carry_slots():
     cand_by_dev = {c["device_id"]: c for c in merged["conflicts"][0]["candidates"]}
     assert cand_by_dev["A"]["slots"] == [_slot("08:00", "16:00", 30, "Büro")]
     assert cand_by_dev["B"]["slots"] == [_slot("09:00", "17:00", 30, "HO")]
+
+
+# --- Forward-Compat (>v3 abweisen) + Absorb/Migration älterer Docs (v1/v2) ---
+
+from src.sync import (
+    NEWER_REMOTE_VERSION_MSG, SCHEMA_VERSION, _remote_is_newer, migrate_doc_to_v3,
+)
+
+
+def test_remote_is_newer():
+    assert _remote_is_newer({"schema_version": SCHEMA_VERSION + 1, "entries": {}}) is True
+    assert _remote_is_newer({"schema_version": 99, "entries": {}}) is True
+    assert _remote_is_newer({"schema_version": SCHEMA_VERSION, "entries": {}}) is False
+    assert _remote_is_newer({"schema_version": 2, "entries": {}}) is False  # älter → absorb
+    assert _remote_is_newer({"entries": {}}) is False
+
+
+def test_migrate_doc_to_v3_wraps_flat_entries():
+    doc = {
+        "schema_version": 2,
+        "entries": {
+            "2026-06-04": {"start": "08:00", "end": "16:00", "pause": 30,
+                           "modified_at": "2026-06-04T10:00:00Z",
+                           "device_id": "B", "deleted": False},
+            "2026-06-05": {"start": None, "end": None, "pause": 0,
+                           "modified_at": "2026-06-05T10:00:00Z",
+                           "device_id": "B", "deleted": True},
+        },
+        "settings": {"recipient": {"value": "x", "modified_at": "t", "device_id": "B"}},
+        "conflicts": [], "meta": {"gc_watermark": "wm"},
+    }
+    out = migrate_doc_to_v3(doc)
+    assert out["schema_version"] == 3
+    assert out["entries"]["2026-06-04"]["slots"] == [
+        {"start": "08:00", "end": "16:00", "pause": 30, "kategorie": ""}]
+    assert out["entries"]["2026-06-05"]["slots"] == []        # Tombstone → leer
+    assert out["entries"]["2026-06-05"]["deleted"] is True
+    assert out["settings"] == doc["settings"]                 # unberührt
+    assert out["meta"] == {"gc_watermark": "wm"}
+
+
+def test_migrate_doc_to_v3_is_idempotent_on_v3():
+    slots = [{"start": "08:00", "end": "16:00", "pause": 0, "kategorie": "X"}]
+    v3 = {"schema_version": 3,
+          "entries": {"D": {"slots": slots, "modified_at": "t",
+                            "device_id": "B", "deleted": False}},
+          "settings": {}, "conflicts": [], "meta": {"gc_watermark": ""}}
+    out = migrate_doc_to_v3(v3)
+    assert out["entries"]["D"]["slots"] == slots
+
+
+def _newer_remote_bytes():
+    """Remote-Doc eines NEUEREN Schemas (>v3), das dieser Client nicht versteht."""
+    return _json.dumps({
+        "schema_version": SCHEMA_VERSION + 1,
+        "entries": {}, "settings": {}, "conflicts": [],
+        "meta": {"gc_watermark": ""},
+    }, ensure_ascii=False).encode("utf-8")
+
+
+def _v2_remote_bytes(entries):
+    """Remote-Doc im alten v2-Flachformat (start/end/pause je Tag)."""
+    return _json.dumps({
+        "schema_version": 2, "entries": entries, "settings": {},
+        "conflicts": [], "meta": {"gc_watermark": ""},
+    }, ensure_ascii=False).encode("utf-8")
+
+
+def _mock_drive(monkeypatch, remote_bytes):
+    from src import drive
+    monkeypatch.setattr(drive, "get_drive_service", lambda *a, **k: object())
+    monkeypatch.setattr(drive, "find_sync_file", lambda service: "file-1")
+    monkeypatch.setattr(drive, "download", lambda service, fid: (remote_bytes, "etag-x"))
+    return drive
+
+
+def test_run_pull_aborts_on_newer_remote(tmp_path, monkeypatch):
+    """Pull gegen ein neueres Schema (>v3): Abbruch, nichts angewendet."""
+    import src.main as main
+    storage = Storage(str(tmp_path / "z.json"), device_id="A")
+    settings = Settings(str(tmp_path / "s.json"))
+    settings.device_id_for_sync = "A"
+    conflicts = ConflictsStore(str(tmp_path / "c.json"))
+    before = settings.get("last_pull_at")
+    _mock_drive(monkeypatch, _newer_remote_bytes())
+    received = {}
+    def cb(ok, error, tb=""):
+        received["ok"] = ok; received["error"] = error
+    main._run_pull_in_background(storage, settings, conflicts, str(tmp_path), cb)
+    assert received["ok"] is False
+    assert str(received["error"]) == NEWER_REMOTE_VERSION_MSG
+    assert storage.get_all_raw() == {}
+    assert settings.get("last_pull_at") == before
+
+
+def test_run_pull_absorbs_v2_remote(tmp_path, monkeypatch):
+    """Pull gegen ein älteres v2-Remote: migriert + gemergt (nicht abgewiesen)."""
+    import src.main as main
+    storage = Storage(str(tmp_path / "z.json"), device_id="A")
+    settings = Settings(str(tmp_path / "s.json"))
+    settings.device_id_for_sync = "A"
+    conflicts = ConflictsStore(str(tmp_path / "c.json"))
+    _mock_drive(monkeypatch, _v2_remote_bytes({"2026-06-20": {
+        "start": "08:00", "end": "16:00", "pause": 30,
+        "modified_at": "2026-06-20T10:00:00Z", "device_id": "B", "deleted": False}}))
+    received = {}
+    def cb(ok, error, tb=""):
+        received["ok"] = ok; received["error"] = error
+    main._run_pull_in_background(storage, settings, conflicts, str(tmp_path), cb)
+    assert received["ok"] is True
+    assert storage.get_all_raw()["2026-06-20"]["slots"] == [
+        {"start": "08:00", "end": "16:00", "pause": 30, "kategorie": ""}]
+
+
+def test_run_push_aborts_on_newer_remote(tmp_path, monkeypatch):
+    """Push gegen ein neueres Schema (>v3): Abbruch, kein Upload, lokal unverändert."""
+    import src.main as main
+    storage = Storage(str(tmp_path / "z.json"), device_id="A")
+    storage.save("2026-06-09", [_slot("09:00", "17:00")])
+    before = storage.get_all_raw()
+    settings = Settings(str(tmp_path / "s.json"))
+    settings.device_id_for_sync = "A"
+    conflicts = ConflictsStore(str(tmp_path / "c.json"))
+    drive = _mock_drive(monkeypatch, _newer_remote_bytes())
+    upload_calls = []
+    monkeypatch.setattr(drive, "upload",
+                        lambda *a, **k: (upload_calls.append(a), ("id", "etag"))[1])
+    res = main._run_push_blocking(storage, settings, conflicts, str(tmp_path))
+    assert res.get("ok") is False
+    assert str(res.get("error")) == NEWER_REMOTE_VERSION_MSG
+    assert upload_calls == []
+    assert storage.get_all_raw() == before
+
+
+def test_run_push_absorbs_v2_remote_before_upload(tmp_path, monkeypatch):
+    """Push gegen ein v2-Remote: migriert + merged, lädt die Vereinigung als v3
+    hoch — fremde v2-Einträge gehen nicht verloren."""
+    import src.main as main
+    storage = Storage(str(tmp_path / "z.json"), device_id="A")
+    storage.save("2026-06-09", [_slot("09:00", "17:00")])   # lokal A
+    settings = Settings(str(tmp_path / "s.json"))
+    settings.device_id_for_sync = "A"
+    conflicts = ConflictsStore(str(tmp_path / "c.json"))
+    drive = _mock_drive(monkeypatch, _v2_remote_bytes({"2026-06-20": {
+        "start": "08:00", "end": "16:00", "pause": 30,
+        "modified_at": "2026-06-20T10:00:00Z", "device_id": "B", "deleted": False}}))
+    uploaded = {}
+    def _fake_upload(service, content, file_id=None, expected_etag=None):
+        uploaded["doc"] = _json.loads(content); return ("file-1", "etag-new")
+    monkeypatch.setattr(drive, "upload", _fake_upload)
+    res = main._run_push_blocking(storage, settings, conflicts, str(tmp_path))
+    assert res.get("ok") is True
+    assert uploaded["doc"]["schema_version"] == 3
+    assert set(uploaded["doc"]["entries"]) == {"2026-06-09", "2026-06-20"}
+    assert "slots" in storage.get_all_raw()["2026-06-20"]
+
+
+def test_run_compaction_aborts_on_newer_remote(tmp_path, monkeypatch):
+    """Kompaktierung gegen ein neueres Schema (>v3): bricht freundlich ab."""
+    import src.main as main
+    storage = Storage(str(tmp_path / "z.json"), device_id="A")
+    settings = Settings(str(tmp_path / "s.json"))
+    settings.device_id_for_sync = "A"
+    conflicts = ConflictsStore(str(tmp_path / "c.json"))
+    drive = _mock_drive(monkeypatch, _newer_remote_bytes())
+    upload_calls = []
+    monkeypatch.setattr(drive, "upload",
+                        lambda *a, **k: (upload_calls.append(a), ("id", "etag"))[1])
+    res = main._run_compaction_blocking(storage, settings, conflicts, str(tmp_path))
+    assert res.get("ok") is False
+    assert res.get("reason") == "newer_version"
+    assert upload_calls == []
+    assert storage.get_all_raw() == {}
