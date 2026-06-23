@@ -165,7 +165,7 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change,
     ist_btns.pack(fill="x", pady=(2, 8))
     secondary_button(
         ist_btns, "+ Slot",
-        lambda: add_ist_row(default_start, default_end, 0, ""),
+        lambda: add_ist_row(default_start, default_end, default_pause, ""),
     ).pack(side=tk.LEFT, padx=2)
 
     def save_ist():

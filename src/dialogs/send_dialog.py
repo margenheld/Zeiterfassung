@@ -227,7 +227,9 @@ def open_send_dialog(parent, storage, settings, base_path):
             )
             return
 
-        entries = all_entries
+        # Frisch lesen statt den Dialog-Snapshot zu senden — der Storage kann
+        # sich bei offenem Dialog geändert haben (Hintergrund-Drive-Sync).
+        entries = storage.get_all()
         categories = _selected_categories()
 
         html, total = generate_report(
