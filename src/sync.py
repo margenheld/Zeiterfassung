@@ -17,15 +17,6 @@ import uuid
 SCHEMA_VERSION = 3
 
 
-OLD_REMOTE_VERSION_MSG = (
-    "Ein anderes Gerät nutzt eine ältere App-Version, die das neue Format "
-    "(Mehrfach-Slots/Kategorien) noch nicht versteht.\n\n"
-    "Bitte aktualisiere die App auf dem anderen Gerät, bevor du dort "
-    "synchronisierst. Bis dahin pausiert die Synchronisation, damit keine "
-    "Daten verloren gehen."
-)
-
-
 NEWER_REMOTE_VERSION_MSG = (
     "Ein anderes Gerät nutzt eine neuere App-Version mit einem Datenformat, "
     "das diese (ältere) Version noch nicht versteht.\n\n"
@@ -291,14 +282,6 @@ def compact_local(storage, settings, conflicts_store, now):
         c for c in conflicts_store.get_all()
         if not _is_settled_conflict(c, now)
     ])
-
-
-def _remote_is_pre_v3(remote_doc):
-    """True, wenn das Remote-Doc von einem Gerät stammt, das das Multi-Slot-
-    Schema (v3) noch nicht versteht (schema_version < 3). Dann ist ein
-    älteres Gerät aktiv: Kompaktierung muss abbrechen, und ein v2-Remote darf
-    nicht in einen v3-Client gemergt werden (er hätte keine `slots`)."""
-    return (remote_doc.get("schema_version") or 1) < 3
 
 
 def migrate_doc_to_v3(remote_doc):

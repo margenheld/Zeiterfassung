@@ -593,7 +593,7 @@ def test_merge_no_suppression_when_remote_present():
 
 # --- Kompaktierungs-Helfer ---
 
-from src.sync import compact_local, _remote_is_pre_v3
+from src.sync import compact_local
 
 
 def test_compact_local_strips_stores_and_sets_watermark(tmp_path):
@@ -623,13 +623,6 @@ def test_compact_local_strips_stores_and_sets_watermark(tmp_path):
     assert "LIVE" in raw               # lebend bleibt
     remaining = [c["id"] for c in conflicts.get_all()]
     assert remaining == ["c-2"]        # nur unresolved bleibt
-
-
-def test_remote_is_pre_v3():
-    assert _remote_is_pre_v3({"schema_version": 1, "entries": {}}) is True
-    assert _remote_is_pre_v3({"schema_version": 2, "entries": {}}) is True
-    assert _remote_is_pre_v3({"schema_version": 3, "entries": {}}) is False
-    assert _remote_is_pre_v3({}) is True  # fehlende schema_version → pre-v3
 
 
 def test_merge_slot_reorder_is_not_a_conflict():
