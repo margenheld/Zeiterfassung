@@ -131,11 +131,21 @@ class ReservationStore:
 
     def save(self, date_str, slots):
         """Legt die Reservierungs-Slots eines Tages an oder überschreibt sie.
-        Die übergebenen Slots werden so gespeichert, wie sie sind (inkl.
-        mitgelieferter gcal_event_id). Das Bewahren bestehender event_ids über
-        Edits hinweg übernimmt der Reconcile (AP7), nicht dieser save-Pfad."""
+
+        Dialog-Edits liefern Slots OHNE gcal_event_id. Damit der Reconcile die
+        zugehörigen Kalender-Events aktualisiert statt sie zu löschen und neu
+        anzulegen, übernehmen wir bestehende event_ids positionsweise vom
+        vorherigen Stand. Eine explizit mitgelieferte gcal_event_id hat Vorrang;
+        Zeilen über den Altbestand hinaus bleiben ohne id (→ neues Event)."""
+        existing_slots = (self._data.get(date_str) or {}).get("slots", [])
+        new_slots = []
+        for i, s in enumerate(slots):
+            ns = _normalize_slot(s)
+            if ns["gcal_event_id"] is None and i < len(existing_slots):
+                ns["gcal_event_id"] = existing_slots[i].get("gcal_event_id")
+            new_slots.append(ns)
         self._data[date_str] = {
-            "slots": [_normalize_slot(s) for s in slots],
+            "slots": new_slots,
             "modified_at": _utc_now_iso(),
             "deleted": False,
         }

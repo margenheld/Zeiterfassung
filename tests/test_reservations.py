@@ -44,10 +44,34 @@ def test_save_stamps_metadata(store):
 
 
 def test_save_stores_provided_event_id(store):
-    """save speichert eine mitgelieferte gcal_event_id am Slot. Der Erhalt
-    bestehender event_ids über Edits ist Sache des Reconcile (AP7)."""
+    """save speichert eine mitgelieferte gcal_event_id am Slot."""
     store.save("2026-06-01", [_slot("09:00", "17:00", "", "ev-1")])
     assert store.get_all_raw()["2026-06-01"]["slots"][0]["gcal_event_id"] == "ev-1"
+
+
+def test_save_preserves_event_id_by_index_on_edit(store):
+    """Ein Dialog-Edit liefert Slots OHNE gcal_event_id. save übernimmt die
+    bestehenden ids positionsweise, damit der Reconcile die Events aktualisiert
+    statt sie zu löschen und neu anzulegen."""
+    store.save("2026-06-01", [_slot("08:00", "12:00", "A", "E1"),
+                              _slot("13:00", "17:00", "B", "E2")])
+    # Edit über den Dialog: geänderte Zeiten, KEINE event_ids mitgeliefert.
+    store.save("2026-06-01", [{"start": "09:00", "end": "12:00", "kategorie": "A"},
+                              {"start": "13:00", "end": "18:00", "kategorie": "B"}])
+    slots = store.get_all_raw()["2026-06-01"]["slots"]
+    assert [s["gcal_event_id"] for s in slots] == ["E1", "E2"]
+    assert slots[0]["start"] == "09:00" and slots[1]["end"] == "18:00"
+
+
+def test_save_new_slot_beyond_existing_has_no_event_id(store):
+    """Eine über den Altbestand hinaus hinzugefügte Zeile bekommt keine id
+    (→ der Reconcile legt dafür ein neues Event an)."""
+    store.save("2026-06-01", [_slot("08:00", "12:00", "A", "E1")])
+    store.save("2026-06-01", [{"start": "08:00", "end": "12:00", "kategorie": "A"},
+                              {"start": "13:00", "end": "17:00", "kategorie": "B"}])
+    slots = store.get_all_raw()["2026-06-01"]["slots"]
+    assert slots[0]["gcal_event_id"] == "E1"
+    assert slots[1]["gcal_event_id"] is None
 
 
 def test_slot_defaults_kategorie_and_event_id(store):
