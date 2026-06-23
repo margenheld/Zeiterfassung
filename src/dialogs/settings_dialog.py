@@ -152,7 +152,14 @@ def open_settings_dialog(parent, settings, base_path, on_change, *,
 
     def _refresh_sender():
         """OAuth-Flow + userinfo-Fetch im Thread, danach Label aktualisieren."""
+        from src.dialogs.send_dialog import show_missing_credentials_dialog
         from src.mail import fetch_user_email, get_gmail_service
+
+        if not os.path.exists(creds_path):
+            # Konsistent mit Senden/Teilen: freundlicher Hinweis + „Datenordner
+            # öffnen" statt OAuth-Traceback bei fehlender credentials.json.
+            show_missing_credentials_dialog(dialog, base_path)
+            return
 
         _set_sender_btn_text("Verbinde…")
 
