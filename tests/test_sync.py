@@ -737,7 +737,8 @@ def test_run_pull_aborts_on_newer_remote(tmp_path, monkeypatch):
     _mock_drive(monkeypatch, _newer_remote_bytes())
     received = {}
     def cb(ok, error, tb=""):
-        received["ok"] = ok; received["error"] = error
+        received["ok"] = ok
+        received["error"] = error
     main._run_pull_in_background(storage, settings, conflicts, str(tmp_path), cb)
     assert received["ok"] is False
     assert str(received["error"]) == NEWER_REMOTE_VERSION_MSG
@@ -757,7 +758,8 @@ def test_run_pull_absorbs_v2_remote(tmp_path, monkeypatch):
         "modified_at": "2026-06-20T10:00:00Z", "device_id": "B", "deleted": False}}))
     received = {}
     def cb(ok, error, tb=""):
-        received["ok"] = ok; received["error"] = error
+        received["ok"] = ok
+        received["error"] = error
     main._run_pull_in_background(storage, settings, conflicts, str(tmp_path), cb)
     assert received["ok"] is True
     assert storage.get_all_raw()["2026-06-20"]["slots"] == [
@@ -798,7 +800,8 @@ def test_run_push_absorbs_v2_remote_before_upload(tmp_path, monkeypatch):
         "modified_at": "2026-06-20T10:00:00Z", "device_id": "B", "deleted": False}}))
     uploaded = {}
     def _fake_upload(service, content, file_id=None, expected_etag=None):
-        uploaded["doc"] = _json.loads(content); return ("file-1", "etag-new")
+        uploaded["doc"] = _json.loads(content)
+        return ("file-1", "etag-new")
     monkeypatch.setattr(drive, "upload", _fake_upload)
     res = main._run_push_blocking(storage, settings, conflicts, str(tmp_path))
     assert res.get("ok") is True
