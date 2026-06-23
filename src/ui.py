@@ -531,7 +531,7 @@ class App:
         self.footer_label.pack(side=tk.LEFT, expand=True)
 
         secondary_button(
-            footer_frame, "Teilen…", self._share, padx=12,
+            footer_frame, "Teilen", self._share, padx=12,
         ).pack(side=tk.RIGHT, padx=(0, 4))
         secondary_button(
             footer_frame, "Arbeitszeiten senden", self._send, padx=12,
@@ -684,7 +684,7 @@ class App:
                 actions=[
                     ("Arbeitszeiten senden",
                      lambda: self.root.after(0, self._send), None),
-                    ("Teilen…",
+                    ("Teilen",
                      lambda: self.root.after(0, self._share), None),
                     ("Mit Google Drive synchronisieren",
                      lambda: self.root.after(0, self._tray_sync),
