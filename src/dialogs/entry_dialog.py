@@ -93,15 +93,17 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change,
         ev = tk.StringVar(value=end)
         pv = tk.StringVar(value=str(pause))
         kv = tk.StringVar(value=kategorie)
-        # Basis = die Werte, mit denen die Zeile angelegt wurde. Ein Kategorie-
-        # Wechsel überschreibt ein Feld NUR, solange es noch der Basis
-        # entspricht (= nicht manuell geändert), und zieht die Basis nach.
+        # Basis = die Werte, mit denen die Zeile angelegt wurde. Wählt man für
+        # eine NEUE Zeile eine Kategorie, überschreibt das ein Feld NUR, solange
+        # es noch der Basis entspricht (= nicht manuell geändert), und zieht die
+        # Basis nach.
         base = {"start": start, "end": end, "pause": str(pause)}
         dark_combo(row, sv, TIME_VALUES, width=6).pack(side=tk.LEFT, padx=2)
         tk.Label(row, text="–", font=FONT, bg=BG, fg=TEXT_MUTED).pack(side=tk.LEFT)
         dark_combo(row, ev, TIME_VALUES, width=6).pack(side=tk.LEFT, padx=2)
         dark_combo(row, pv, PAUSE_VALUES, width=4).pack(side=tk.LEFT, padx=2)
-        dark_combo_editable(row, kv, categories, width=14).pack(side=tk.LEFT, padx=2)
+        cat_combo = dark_combo_editable(row, kv, categories, width=14)
+        cat_combo.pack(side=tk.LEFT, padx=2)
         record = {"frame": row, "start": sv, "end": ev, "pause": pv, "kategorie": kv}
 
         def on_cat_change(*_a):
@@ -120,8 +122,13 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change,
                 pv.set(t_pause)
                 base["pause"] = t_pause
 
-        # Trace NACH dem initialen kv-Set, damit die Vorbelegung nicht feuert.
-        kv.trace_add("write", on_cat_change)
+        # Standardzeiten der Kategorie ziehen nur bei NEUEN (entfernbaren) Zeilen
+        # und nur bei echter Auswahl aus der Vorschlagsliste (<<ComboboxSelected>>)
+        # — nicht pro Tastendruck (Freitext würde sonst auf globale Defaults
+        # zurücksetzen) und nicht für bereits gespeicherte Slots (deren Zeiten
+        # sind bewusst gesetzt und bleiben unangetastet).
+        if removable:
+            cat_combo.bind("<<ComboboxSelected>>", on_cat_change)
 
         def remove():
             row.destroy()
@@ -204,7 +211,8 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change,
             dark_combo(row, sv, TIME_VALUES, width=6).pack(side=tk.LEFT, padx=2)
             tk.Label(row, text="–", font=FONT, bg=BG, fg=TEXT_MUTED).pack(side=tk.LEFT)
             dark_combo(row, ev, TIME_VALUES, width=6).pack(side=tk.LEFT, padx=2)
-            dark_combo_editable(row, kv, categories, width=14).pack(side=tk.LEFT, padx=2)
+            cat_combo = dark_combo_editable(row, kv, categories, width=14)
+            cat_combo.pack(side=tk.LEFT, padx=2)
             record = {"frame": row, "start": sv, "end": ev, "kategorie": kv}
 
             def on_cat_change(*_a):
@@ -220,7 +228,9 @@ def open_entry_dialog(parent, date_str, storage, settings, on_change,
                     ev.set(t_end)
                     base["end"] = t_end
 
-            kv.trace_add("write", on_cat_change)
+            # Nur bei neuen Zeilen + echter Auswahl ziehen (siehe add_ist_row).
+            if removable:
+                cat_combo.bind("<<ComboboxSelected>>", on_cat_change)
 
             def remove():
                 row.destroy()
