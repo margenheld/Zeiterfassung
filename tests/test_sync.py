@@ -699,3 +699,31 @@ def test_run_pull_aborts_on_newer_remote(tmp_path, monkeypatch):
     assert str(received["error"]) == NEWER_REMOTE_VERSION_MSG
     assert storage.get_all_raw() == {}              # nichts angewendet
     assert settings.get("last_pull_at") == before_pull_at  # unverändert
+
+
+def test_run_compaction_aborts_on_newer_remote(tmp_path, monkeypatch):
+    """Kompaktierung gegen ein v3-Remote: bricht freundlich ab (reason
+    'newer_version'), wendet NICHTS an und lädt NICHTS hoch (kein Clobber des
+    neueren Docs) — analog zum Pull-Guard, nicht ein roher apply_merge-Crash."""
+    from src import drive
+    import src.main as main
+
+    storage = Storage(str(tmp_path / "z.json"), device_id="A")
+    settings = Settings(str(tmp_path / "s.json"))
+    settings.device_id_for_sync = "A"
+    conflicts = ConflictsStore(str(tmp_path / "c.json"))
+
+    monkeypatch.setattr(drive, "get_drive_service", lambda *a, **k: object())
+    monkeypatch.setattr(drive, "find_sync_file", lambda service: "file-1")
+    monkeypatch.setattr(drive, "download", lambda service, fid: (_v3_remote_bytes(), "etag-x"))
+    upload_calls = []
+    monkeypatch.setattr(
+        drive, "upload",
+        lambda *a, **k: (upload_calls.append(a), ("id", "etag"))[1])
+
+    res = main._run_compaction_blocking(storage, settings, conflicts, str(tmp_path))
+
+    assert res.get("ok") is False
+    assert res.get("reason") == "newer_version"     # freundlicher Fall, kein Traceback
+    assert upload_calls == []                        # neueres Remote-Doc NICHT überschrieben
+    assert storage.get_all_raw() == {}              # nichts lokal angewendet

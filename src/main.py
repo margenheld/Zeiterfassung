@@ -159,7 +159,10 @@ def _run_compaction_blocking(storage, settings, conflicts_store, base, timeout_s
     {"ok": bool, "reason": str, "error": ..., "tb": ...}.
 
     reason == "old_version": ein älteres Gerät ist aktiv (Remote ist pre-v2),
-    Kompaktierung abgebrochen, KEINE Änderung vorgenommen."""
+    Kompaktierung abgebrochen, KEINE Änderung vorgenommen.
+    reason == "newer_version": ein neueres Gerät hat ein Schema geschrieben, das
+    diese Version nicht versteht — Kompaktierung abgebrochen, kein Merge/Upload
+    (sonst Crash in apply_merge bzw. Überschreiben des neueren Docs)."""
     import json
     from src import drive, sync
 
@@ -179,9 +182,15 @@ def _run_compaction_blocking(storage, settings, conflicts_store, base, timeout_s
                     remote_doc = json.loads(content)
                 except (json.JSONDecodeError, ValueError):
                     remote_doc = {"schema_version": 1}
-                # v1-Guard auf dem FRISCH gepullten Doc (nie gecacht):
+                # Guards auf dem FRISCH gepullten Doc (nie gecacht):
                 if sync._remote_is_pre_v2(remote_doc):
                     result.update({"ok": False, "reason": "old_version"})
+                    return
+                # Forward-Compat: neueres Schema nicht mergen/überschreiben
+                # (analog zu Pull/Push) — sonst crasht apply_merge bzw. das
+                # neuere Remote-Doc würde beim Upload geplättet.
+                if sync._remote_is_newer(remote_doc):
+                    result.update({"ok": False, "reason": "newer_version"})
                     return
             else:
                 remote_doc = {"schema_version": 2, "entries": {}, "settings": {},
