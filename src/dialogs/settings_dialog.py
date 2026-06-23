@@ -529,7 +529,7 @@ def open_settings_dialog(parent, settings, base_path, on_change, *,
 
     if storage is not None:
         secondary_button(
-            btn_row, "Daten importieren…", _open_import_dialog, padx=12, pady=2,
+            btn_row, "Daten importieren", _open_import_dialog, padx=12, pady=2,
         ).pack(side=tk.LEFT, padx=(8, 0))
 
     if settings.get("sync_enabled") and storage is not None and conflicts_store is not None:

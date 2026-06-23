@@ -180,7 +180,7 @@ def open_share_dialog(parent, storage, settings, base_path, reservation_store=No
                 "<p>Hallo,</p>"
                 f"<p>im Anhang findest Du meine {what} als JSON-Datei.</p>"
                 "<p>Du kannst die Datei in der Zeiterfassung-App über "
-                "<em>Einstellungen → Daten importieren…</em> einlesen. "
+                "<em>Einstellungen → Daten importieren</em> einlesen. "
                 "Vor dem Import kannst Du einen Zeitraum auswählen und je "
                 "Datentyp festlegen, was bei Konflikten passieren soll.</p>"
                 f"<p>Viele Grüße<br/>{display_name}</p>"
